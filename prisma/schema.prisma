@@ -1,0 +1,287 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CrmTarget {
+  Yes
+  No
+  Maybe
+}
+
+// Read directly from Redash query 10505's crm_status field: A=Active,
+// P=Paused, E=Expired. NA means the merchant has never appeared in that
+// query (no CRM license history at all).
+enum CrmStatus {
+  NA
+  Active
+  Paused
+  Expired
+}
+
+enum LoyaltyStatus {
+  Active
+  Inactive
+}
+
+enum WabaStatus {
+  Active
+  Inactive
+}
+
+enum OnboardStatus {
+  Onboarded
+  NotOnboarded
+}
+
+enum RistaStatus {
+  Active
+  Inactive
+}
+
+enum DotpeStatus {
+  Active
+  Inactive
+}
+
+enum UserRole {
+  ADMIN
+  MEMBER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  role         UserRole @default(MEMBER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Merchant {
+  id String @id @default(cuid())
+
+  // Identity
+  ristaBrandId String? @unique
+  dotpeMid     String  @unique
+  brandName    String
+  pocName      String?
+  pocNumber    String?
+  // Join keys for the competitor branch-count sheet (Account Number / BusinessID, one row per merchant-provider pair)
+  accountNumber String?
+  businessId    String?
+
+  // Footprint
+  totalStores         Int @default(0)
+  activeDineInStores   Int @default(0)
+  loyaltyActiveStores  Int @default(0)
+  paidBranches         Int @default(0)
+  closedBranches       Int @default(0)
+
+  // Commercials
+  paymentCollectedDate  DateTime?
+  closureDate           DateTime?
+  paymentCollected      Decimal   @default(0) @db.Decimal(14, 2)
+  // computed = activeDineInStores * 10000, kept in sync on write
+  totalYearlyPotential  Decimal   @default(0) @db.Decimal(14, 2)
+  subscriptionRevenue   Decimal   @default(0) @db.Decimal(14, 2)
+  creditConsumedL30     Decimal   @default(0) @db.Decimal(14, 2)
+
+  // Competitor presence (branch counts on DotPe CRM's product surface)
+  reeloBranches       Int @default(0)
+  xenoBranches         Int @default(0)
+  dotpeBranches        Int @default(0)
+  fudrBranches         Int @default(0)
+  easyrewardsBranches  Int @default(0)
+
+  // Sales / CRM status
+  crmTarget      CrmTarget      @default(Maybe)
+  lastDemoStatus DateTime?
+  crmStatus      CrmStatus      @default(NA)
+  crmEnabledOn   DateTime?
+  // "CRM Activation Status" column, CRM+Loyalty closures tab — the ops-confirmed
+  // signal for the dashboard's "Paid" funnel count (crmStatus alone over-counts
+  // from Redash's broader crm_merchants table, which includes non-closed rows).
+  crmActivationConfirmed Boolean @default(false)
+  loyaltyStatus  LoyaltyStatus  @default(Inactive)
+  wabaStatus     WabaStatus     @default(Inactive)
+  onboarded      OnboardStatus  @default(NotOnboarded)
+  ristaStatus    RistaStatus    @default(Inactive)
+  dotpeStatus    DotpeStatus    @default(Inactive)
+
+  // Usage
+  customerCount           Int     @default(0)
+  l30Txn                  Int     @default(0)
+  preCrmCredits            Decimal @default(0) @db.Decimal(14, 2)
+  postCrmCredits           Decimal @default(0) @db.Decimal(14, 2)
+  momCreditConsumption     Decimal @default(0) @db.Decimal(14, 2)
+  creditConsumptionBreakup Json?
+  totalContactsReached     Int     @default(0)
+
+  // Loyalty
+  loyaltyProgram      String?
+  loyaltyPointsEarned Int     @default(0)
+  loyaltyPointsBurned Int     @default(0)
+
+  // Automations
+  automationsRules          Json?
+  automationsActivateDate   DateTime?
+  automationsTotalSent      Int       @default(0)
+
+  // Campaigns
+  campaignsSetup           Int @default(0)
+  campaignsContactsReached Int @default(0)
+  campaignsUsingRfm        Int @default(0)
+
+  // Support
+  bugRaised       String?
+  featureRequest  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  snapshots          MerchantSnapshot[]
+  supportRequests    SupportRequest[]
+  onboardingRequests OnboardingRequest[]
+
+  @@index([brandName])
+  @@index([crmStatus])
+  @@index([loyaltyStatus])
+  @@index([onboarded])
+}
+
+model MerchantSnapshot {
+  id         String   @id @default(cuid())
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  fieldName  String
+  value      Decimal  @db.Decimal(14, 2)
+  capturedAt DateTime @default(now())
+
+  @@unique([merchantId, fieldName, capturedAt])
+}
+
+enum SyncSource {
+  REDASH
+  GSHEETS
+}
+
+model SyncRun {
+  id         String     @id @default(cuid())
+  source     SyncSource
+  startedAt  DateTime   @default(now())
+  finishedAt DateTime?
+  success    Boolean    @default(false)
+  summary    Json?
+  error      String?
+
+  @@index([source, finishedAt])
+}
+
+// Portfolio-wide weekly consumed/recharged, pre-synced from Redash so the
+// dashboard reads its own DB instead of calling Redash live on every page
+// load (that query alone can take 30-60s+ against production data).
+model PortfolioTrend {
+  id        String   @id @default(cuid())
+  week      String   @unique
+  consumed  Decimal  @default(0) @db.Decimal(14, 2)
+  recharged Decimal  @default(0) @db.Decimal(14, 2)
+  syncedAt  DateTime @default(now()) @updatedAt
+}
+
+enum SupportRequestType {
+  Bug
+  Feature
+}
+
+model SupportRequest {
+  id             String             @id @default(cuid())
+  merchantId     String
+  merchant       Merchant           @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  type           SupportRequestType
+  description    String
+  images         Json? // string[] of file paths under /uploads/requests/{id}/
+  // Manual entry at submission time (not auto-computed from merchant data) — editable after the fact
+  totalBranches  Int                @default(0)
+  totalPotential Decimal            @default(0) @db.Decimal(14, 2)
+  productRemarks String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  createdBy      String?
+
+  @@index([merchantId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model RoadmapItem {
+  id             String    @id @default(cuid())
+  theme          String?
+  title          String
+  ticketUrl      String? // raw multi-line "1. url\n2. url" text as stored in the sheet
+  design         String? // free text — values are inconsistent in source ("✅" / "Required" / "Not required" / "Not reqd")
+  rista          String? // "Needed" or blank
+  priority       String? // P0/P1/P2/P3/"Picked"/blank
+  usp            Boolean   @default(false)
+  status         String // primary filter/category — Shipped / Feature / Merchant ask / New Product / Bug / blank; not a strict enum
+  goLiveDate     String? // often not a clean date (e.g. "Sept"), stored as free text
+  manpowerWeeks  Decimal?  @db.Decimal(6, 2)
+  description    String?
+  brandSignal    String?
+  why            String?
+  syncedAt       DateTime  @default(now()) @updatedAt
+
+  @@index([status])
+  @@index([priority])
+  @@index([theme])
+}
+
+// Mirrors the "Dotpe CRM [Activation] > Loyalty enable" Google Sheet 1:1 —
+// column order matches exactly, including the BE's own write-back columns
+// (loyaltyEnabled/loyaltyEnabledAt/crmEnabled/crmEnabledAt), which this app
+// never writes, only reads back on sync. sheetRowIndex is the join key: it's
+// stable across syncs since the sheet is append-only, never reordered.
+model OnboardingRequest {
+  id         String    @id @default(cuid())
+  sheetRowIndex Int    @unique
+  timestamp  DateTime?
+  email      String?
+  businessName String?
+
+  merchantId String?
+  merchant   Merchant? @relation(fields: [merchantId], references: [id], onDelete: SetNull)
+
+  enterpriseMerchantId String? // "MerchantID (enterprise):" — matched to Merchant.dotpeMid where possible
+  ristaBusinessId       String? // "BusinessID (rista):"
+  ristaBrandId          String? // "BrandID (rista):"
+  ristaBranchId         String? // "BranchID (rista):"
+  branchCode            String?
+  storeCode             String?
+  enterpriseStoreId     String? // "StoreId (enterprise):"
+
+  loyaltyType String? // "Visit based loyalty" / "Point based loyalty" (free text — values seen in source)
+  automation  Boolean @default(false)
+  dotpeUsername String?
+  crmLicenseRequested Boolean @default(false) // "CRM license enable?"
+
+  // BE write-back — this app reads these, never sets them
+  loyaltyEnabled   Boolean   @default(false) // "Is Enabled (DO NOT FILL)"
+  loyaltyEnabledAt DateTime? // "Enabled At (DO NOT FILL)"
+  crmEnabled       Boolean   @default(false) // "CRM is Enabled (DO NOT FILL)"
+  crmEnabledAt     DateTime? // "CRM enabled At (DO NOT FILL)"
+
+  additionalComment String?
+  remarks           String?
+
+  createdViaPlatform Boolean  @default(false) // true only for requests submitted through this app's native form
+  syncedAt           DateTime @default(now()) @updatedAt
+
+  @@index([merchantId])
+  @@index([loyaltyEnabled])
+  @@index([crmEnabled])
+}

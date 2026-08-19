@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/sync-redash", "schedule": "30 3 * * *" },
+    { "path": "/api/cron/sync-gsheets", "schedule": "40 3 * * *" }
+  ]
+}

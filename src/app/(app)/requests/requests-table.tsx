@@ -1,0 +1,125 @@
+"use client";
+
+import { useState } from "react";
+import { ImageIcon } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { SortableHead } from "@/components/sortable-head";
+import { formatNumber, formatInr, formatDate } from "@/lib/format";
+import { useSort } from "@/hooks/use-sort";
+import { cn } from "@/lib/utils";
+import type { SerializedSupportRequest } from "@/lib/serialize";
+import { RequestDetailSheet } from "./request-detail-sheet";
+
+export type RequestRow = SerializedSupportRequest & {
+  merchant: { id: string; brandName: string; dotpeMid: string };
+};
+
+const ACCESSORS = {
+  brandName: (r: RequestRow) => r.merchant.brandName,
+  type: (r: RequestRow) => r.type,
+  totalBranches: (r: RequestRow) => r.totalBranches,
+  totalPotential: (r: RequestRow) => r.totalPotential,
+  createdAt: (r: RequestRow) => new Date(r.createdAt),
+};
+
+function TypeBadge({ type }: { type: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-[12px] font-medium",
+        type === "Bug"
+          ? "border-negative/20 bg-negative/10 text-negative-foreground"
+          : "border-primary/20 bg-primary/10 text-primary"
+      )}
+    >
+      {type}
+    </span>
+  );
+}
+
+type MerchantOption = { id: string; brandName: string; totalStores: number; totalYearlyPotential: number };
+
+export function RequestsTable({ rows, merchants }: { rows: RequestRow[]; merchants: MerchantOption[] }) {
+  const [selected, setSelected] = useState<RequestRow | null>(null);
+  const { sorted, sortKey, direction, toggleSort } = useSort(rows, ACCESSORS, {
+    key: "createdAt",
+    direction: "desc",
+  });
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <SortableHead label="Merchant" sortKey="brandName" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
+            <SortableHead label="Type" sortKey="type" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
+            <TableHead className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Description
+            </TableHead>
+            <TableHead className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Images
+            </TableHead>
+            <SortableHead label="Branches" sortKey="totalBranches" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+            <SortableHead label="Potential" sortKey="totalPotential" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+            <SortableHead label="Created" sortKey="createdAt" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sorted.length === 0 ? (
+            <TableRow className="hover:bg-transparent">
+              <TableCell colSpan={7} className="py-12 text-center text-[13px] text-muted-foreground">
+                No requests yet.
+              </TableCell>
+            </TableRow>
+          ) : (
+            sorted.map((row) => (
+              <TableRow key={row.id} onClick={() => setSelected(row)} className="cursor-pointer">
+                <TableCell className="px-4 py-3.5 text-[13px] font-medium text-foreground">
+                  {row.merchant.brandName}
+                </TableCell>
+                <TableCell className="px-4 py-3.5">
+                  <TypeBadge type={row.type} />
+                </TableCell>
+                <TableCell className="max-w-xs px-4 py-3.5 text-[13px] text-foreground">
+                  <p className="truncate">{row.description}</p>
+                </TableCell>
+                <TableCell className="px-4 py-3.5">
+                  {row.images.length > 0 ? (
+                    <span className="inline-flex items-center gap-1 text-[12px] text-muted-foreground">
+                      <ImageIcon className="size-3.5" />
+                      {row.images.length}
+                    </span>
+                  ) : (
+                    <span className="text-[12px] text-muted-foreground/60">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="px-4 py-3.5 text-right text-[13px] text-foreground">
+                  {formatNumber(row.totalBranches)}
+                </TableCell>
+                <TableCell className="px-4 py-3.5 text-right text-[13px] text-foreground">
+                  {formatInr(row.totalPotential, { compact: true })}
+                </TableCell>
+                <TableCell className="px-4 py-3.5 text-right text-[13px] text-muted-foreground">
+                  {formatDate(row.createdAt)}
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+
+      <RequestDetailSheet
+        row={selected}
+        merchants={merchants}
+        onOpenChange={(open) => !open && setSelected(null)}
+      />
+    </div>
+  );
+}
