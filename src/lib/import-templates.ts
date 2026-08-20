@@ -31,6 +31,7 @@
 // "Low balance"/"No balance" in Loyalty and others). Everything else is
 // "Merchant".
 
+import { randomUUID } from "crypto";
 import { PrismaClient, TemplateChannel, TemplateDealType, TemplateCategory, TemplateHandle } from "@prisma/client";
 import { readSheetAsObjects } from "./gsheets";
 
@@ -116,14 +117,18 @@ export async function importMessageTemplates(prisma: PrismaClient) {
   const loyaltyRows = await collectFromLoyaltyTab(existingTexts);
   const all = [...automationRows, ...loyaltyRows];
 
-  let inserted = 0;
-  let ristaHandleCount = 0;
-  for (const row of all) {
-    const template = await prisma.template.create({ data: row });
-    await prisma.templateApproval.create({ data: { templateId: template.id, approvalStatus: "Approved" } });
-    inserted++;
-    if (row.handle === "RistaByDotpe") ristaHandleCount++;
-  }
+  // Pre-assign ids so Template and TemplateApproval rows can each be
+  // inserted with a single createMany — one round trip per table instead
+  // of two sequential queries per row, which is what pushed this past a
+  // one-time production run's function-timeout budget.
+  const withIds = all.map((row) => ({ ...row, id: randomUUID() }));
+  await prisma.template.createMany({ data: withIds });
+  await prisma.templateApproval.createMany({
+    data: withIds.map((row) => ({ templateId: row.id, approvalStatus: "Approved" as const })),
+  });
+
+  const inserted = withIds.length;
+  const ristaHandleCount = withIds.filter((r) => r.handle === "RistaByDotpe").length;
 
   return {
     clearedExisting: existing,

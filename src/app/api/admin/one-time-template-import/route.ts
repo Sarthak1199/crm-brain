@@ -7,7 +7,7 @@ import { importMessageTemplates } from "@/lib/import-templates";
 // delete the file. Not gated on CRON_SECRET or session auth: it exists for
 // exactly one manual invocation, authorized by a token generated fresh for
 // this purpose (never derived from, or reused as, any standing secret).
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const ONE_TIME_TOKEN = "86798048a52373841ec9dd65dbdd9eda474d44cc542773b7";
 
