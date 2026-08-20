@@ -23,6 +23,7 @@ export type RequestRow = SerializedSupportRequest & {
 
 const ACCESSORS = {
   brandName: (r: RequestRow) => r.merchant.brandName,
+  dotpeMid: (r: RequestRow) => r.merchant.dotpeMid,
   type: (r: RequestRow) => r.type,
   totalBranches: (r: RequestRow) => r.totalBranches,
   totalPotential: (r: RequestRow) => r.totalPotential,
@@ -59,6 +60,7 @@ export function RequestsTable({ rows, merchants }: { rows: RequestRow[]; merchan
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <SortableHead label="Merchant" sortKey="brandName" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
+            <SortableHead label="MID" sortKey="dotpeMid" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Type" sortKey="type" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <TableHead className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Description
@@ -74,7 +76,7 @@ export function RequestsTable({ rows, merchants }: { rows: RequestRow[]; merchan
         <TableBody>
           {sorted.length === 0 ? (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={7} className="py-12 text-center text-[13px] text-muted-foreground">
+              <TableCell colSpan={8} className="py-12 text-center text-[13px] text-muted-foreground">
                 No requests yet.
               </TableCell>
             </TableRow>
@@ -83,6 +85,9 @@ export function RequestsTable({ rows, merchants }: { rows: RequestRow[]; merchan
               <TableRow key={row.id} onClick={() => setSelected(row)} className="cursor-pointer">
                 <TableCell className="px-4 py-3.5 text-[13px] font-medium text-foreground">
                   {row.merchant.brandName}
+                </TableCell>
+                <TableCell className="px-4 py-3.5 text-[13px] text-muted-foreground">
+                  {row.merchant.dotpeMid}
                 </TableCell>
                 <TableCell className="px-4 py-3.5">
                   <TypeBadge type={row.type} />

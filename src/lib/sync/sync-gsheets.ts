@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { pick, readSheetAsObjects, resolveSheetTitleByGid } from "@/lib/gsheets";
 import { normalizeMid } from "./mid";
 import { withSyncRun, runStep } from "./sync-run";
+import { mapWithConcurrency } from "./concurrency";
 import { GSHEET_SOURCES } from "./gsheet-sources";
 import { syncLoyaltyOnboarding } from "./sync-onboarding";
 
@@ -186,17 +187,14 @@ export async function syncCrmGtmDemoSheet() {
   const title = await resolveSheetTitleByGid(source.spreadsheetId, source.gid);
   const rows = await readSheetAsObjects(source.spreadsheetId, title, source.headerRow);
 
-  let matched = 0;
-  let skipped = 0;
-
-  for (const row of rows) {
+  // Each row updates a different merchant (independent writes), so run them
+  // with bounded concurrency instead of one at a time — sequential awaits
+  // over ~45 rows was a meaningful chunk of why this sync felt like it hung.
+  const outcomes = await mapWithConcurrency(rows, 8, async (row) => {
     const idsRaw = pick(row, "dotpe_merchant_ids");
     const ids = (idsRaw ?? "").split("||").map(normalizeMid).filter(Boolean);
     const dotpeMid = ids[0];
-    if (!dotpeMid) {
-      skipped++;
-      continue;
-    }
+    if (!dotpeMid) return { matched: 0, skipped: 1 };
 
     const totalStores = parseInt_(pick(row, "total_outlets_integrated_counted_once"));
     const dotpeOnly = parseInt_(pick(row, "outlets_dotpe_store_only")) ?? 0;
@@ -210,10 +208,18 @@ export async function syncCrmGtmDemoSheet() {
           dotpeBranches: dotpeOnly + ristaWithDotpe,
         },
       });
-      matched += result.count;
+      return { matched: result.count, skipped: 0 };
     } catch (error) {
       console.error(`syncCrmGtmDemoSheet: skipped MID ${dotpeMid}`, error);
+      return { matched: 0, skipped: 0 };
     }
+  });
+
+  let matched = 0;
+  let skipped = 0;
+  for (const o of outcomes) {
+    matched += o.matched;
+    skipped += o.skipped;
   }
 
   return { matched, skipped };
@@ -222,7 +228,10 @@ export async function syncCrmGtmDemoSheet() {
 /**
  * "CRM [Product] / Roadmap" tab — full replace on every sync (not a
  * per-merchant table, no stable natural key across syncs to upsert against;
- * the sheet itself is the source of truth for the whole list).
+ * the sheet itself is the source of truth for the whole list). Only
+ * replaces sheet-sourced rows (isManual: false) — manually-created "product
+ * ticket" rows from the app's own CRUD are never touched, so they survive
+ * the next sync instead of being wiped by the blanket delete.
  */
 export async function syncRoadmap() {
   const source = GSHEET_SOURCES.roadmap;
@@ -248,7 +257,7 @@ export async function syncRoadmap() {
     .filter((item): item is typeof item & { title: string } => !!item.title);
 
   await prisma.$transaction([
-    prisma.roadmapItem.deleteMany({}),
+    prisma.roadmapItem.deleteMany({ where: { isManual: false } }),
     ...(items.length > 0 ? [prisma.roadmapItem.createMany({ data: items })] : []),
   ]);
 

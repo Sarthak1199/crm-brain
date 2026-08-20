@@ -11,6 +11,7 @@ import {
 } from "./redash-queries";
 import { normalizeMid } from "./mid";
 import { withSyncRun, runStep } from "./sync-run";
+import { mapWithConcurrency } from "./concurrency";
 
 type CreditBreakup = { total?: number; campaigns?: number; loyalty?: number; automations?: number };
 
@@ -148,20 +149,6 @@ export async function syncCreditPrePost() {
 const CREDIT_BREAKUP_MAX_WEEKS = 13; // ~90 days — covers the dashboard's longest date-range preset
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** Runs `fn` over `items` with at most `limit` in flight at once. */
-async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  async function worker() {
-    while (next < items.length) {
-      const i = next++;
-      results[i] = await fn(items[i]);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
-}
 
 /**
  * Step 3: per-merchant weekly credit consumption, split by campaign/

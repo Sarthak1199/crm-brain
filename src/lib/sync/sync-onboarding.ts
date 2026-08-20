@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { pick, readSheetAsObjects, resolveSheetTitleByGid } from "@/lib/gsheets";
 import { normalizeMid } from "./mid";
 import { GSHEET_SOURCES } from "./gsheet-sources";
+import { mapWithConcurrency } from "./concurrency";
 
 function isYes(value: string | undefined) {
   return (value ?? "").trim().toLowerCase() === "yes";
@@ -45,32 +46,26 @@ export async function syncLoyaltyOnboarding() {
   const title = await resolveSheetTitleByGid(source.spreadsheetId, source.gid);
   const rows = await readSheetAsObjects(source.spreadsheetId, title, source.headerRow);
 
-  let synced = 0;
-  let skipped = 0;
+  // One batch lookup instead of a findUnique per row (was ~93 sequential
+  // round-trips on its own — a meaningful chunk of why this sync felt like
+  // it hung), plus running the upserts themselves with bounded concurrency.
+  const merchants = await prisma.merchant.findMany({ select: { id: true, dotpeMid: true } });
+  const merchantIdByMid = new Map(merchants.map((m) => [normalizeMid(m.dotpeMid), m.id]));
 
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const sheetRowIndex = i + source.headerRow + 1;
+  const indexedRows = rows.map((row, i) => ({ row, sheetRowIndex: i + source.headerRow + 1 }));
 
+  const outcomes = await mapWithConcurrency(indexedRows, 8, async ({ row, sheetRowIndex }) => {
     const enterpriseMerchantId = pick(row, "merchantid (enterprise):");
     const normalizedMid = enterpriseMerchantId ? normalizeMid(enterpriseMerchantId) : null;
 
     // A fully blank row (e.g. trailing sheet padding) has no timestamp and nothing else useful.
     const timestamp = parseFormTimestamp(pick(row, "timestamp"));
     if (!timestamp && !enterpriseMerchantId) {
-      skipped++;
-      continue;
+      return "skipped" as const;
     }
 
     try {
-      let merchantId: string | null = null;
-      if (normalizedMid) {
-        const merchant = await prisma.merchant.findUnique({
-          where: { dotpeMid: normalizedMid },
-          select: { id: true },
-        });
-        merchantId = merchant?.id ?? null;
-      }
+      const merchantId = normalizedMid ? (merchantIdByMid.get(normalizedMid) ?? null) : null;
 
       await prisma.onboardingRequest.upsert({
         where: { sheetRowIndex },
@@ -122,11 +117,15 @@ export async function syncLoyaltyOnboarding() {
           remarks: pick(row, "remarks") ?? null,
         },
       });
-      synced++;
+      return "synced" as const;
     } catch (error) {
       console.error(`syncLoyaltyOnboarding: skipped row ${sheetRowIndex}`, error);
+      return "skipped" as const;
     }
-  }
+  });
+
+  const synced = outcomes.filter((o) => o === "synced").length;
+  const skipped = outcomes.filter((o) => o === "skipped").length;
 
   return { synced, skipped };
 }

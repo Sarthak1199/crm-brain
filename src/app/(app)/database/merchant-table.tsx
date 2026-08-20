@@ -23,6 +23,7 @@ export type MerchantRow = {
 
 const ACCESSORS = {
   brandName: (r: MerchantRow) => r.merchant.brandName,
+  dotpeMid: (r: MerchantRow) => r.merchant.dotpeMid,
   crmStatus: (r: MerchantRow) => r.merchant.crmStatus,
   loyaltyLicensed: (r: MerchantRow) => (r.loyaltyLicensed ? "Active" : "Inactive"),
   onboarded: (r: MerchantRow) => r.merchant.onboarded,
@@ -46,6 +47,7 @@ export function MerchantTable({ rows }: { rows: MerchantRow[] }) {
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <SortableHead label="Brand Name" sortKey="brandName" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
+            <SortableHead label="MID" sortKey="dotpeMid" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="CRM License" sortKey="crmStatus" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Loyalty License" sortKey="loyaltyLicensed" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Onboarded" sortKey="onboarded" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -59,7 +61,7 @@ export function MerchantTable({ rows }: { rows: MerchantRow[] }) {
         <TableBody>
           {sorted.length === 0 ? (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={9} className="py-12 text-center text-[13px] text-muted-foreground">
+              <TableCell colSpan={10} className="py-12 text-center text-[13px] text-muted-foreground">
                 No merchants match these filters.
               </TableCell>
             </TableRow>
@@ -72,6 +74,9 @@ export function MerchantTable({ rows }: { rows: MerchantRow[] }) {
               >
                 <TableCell className="px-4 py-3.5 text-[13px] font-medium text-foreground">
                   {row.merchant.brandName}
+                </TableCell>
+                <TableCell className="px-4 py-3.5 text-[13px] text-muted-foreground">
+                  {row.merchant.dotpeMid}
                 </TableCell>
                 <TableCell className="px-4 py-3.5">
                   <StatusBadge value={row.merchant.crmStatus} />

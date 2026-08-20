@@ -12,11 +12,9 @@ import {
 
 export function RoadmapFilters({
   statuses,
-  priorities,
   themes,
 }: {
   statuses: string[];
-  priorities: string[];
   themes: string[];
 }) {
   const router = useRouter();
@@ -44,20 +42,6 @@ export function RoadmapFilters({
           {statuses.map((s) => (
             <SelectItem key={s} value={s}>
               {s}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Select defaultValue={searchParams.get("priority") ?? "all"} onValueChange={(v) => setParam("priority", v)}>
-        <SelectTrigger className="h-9 w-[160px] rounded-lg text-[13px]">
-          <SelectValue placeholder="Priority" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All priorities</SelectItem>
-          {priorities.map((p) => (
-            <SelectItem key={p} value={p}>
-              {p}
             </SelectItem>
           ))}
         </SelectContent>

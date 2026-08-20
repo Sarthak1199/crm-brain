@@ -9,7 +9,7 @@ import { TemplatesFilter } from "./templates-filter";
 import { TemplatesTable } from "./templates-table";
 import type { TemplateRow } from "./templates-table";
 
-type SearchParams = { channel?: string; category?: string };
+type SearchParams = { channel?: string; category?: string; handle?: string };
 
 export default async function TemplatesPage({
   searchParams,
@@ -28,47 +28,43 @@ export default async function TemplatesPage({
     params.category === "Loyalty" ||
     params.category === "Automation" ||
     params.category === "Campaign" ||
-    params.category === "OTP" ||
     params.category === "Utility"
   ) {
     where.category = params.category;
   }
+  if (params.handle === "Merchant" || params.handle === "RistaByDotpe" || params.handle === "DotpeCRM") {
+    where.handle = params.handle;
+  }
 
-  const [templates, merchants] = await Promise.all([
-    prisma.template.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: {
-        approvals: {
-          orderBy: { createdAt: "desc" },
-          include: { merchant: { select: { id: true, brandName: true, dotpeMid: true } } },
-        },
+  const templates = await prisma.template.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    include: {
+      approvals: {
+        orderBy: { createdAt: "desc" },
       },
-    }),
-    prisma.merchant.findMany({
-      select: { id: true, brandName: true, dotpeMid: true },
-      orderBy: { brandName: "asc" },
-    }),
-  ]);
+    },
+  });
 
   const rows: TemplateRow[] = templates.map((t) => ({
     id: t.id,
     channel: t.channel,
     dealType: t.dealType,
     category: t.category,
+    handle: t.handle,
     messageText: t.messageText,
     createdAt: t.createdAt.toISOString(),
     approvals: t.approvals,
   }));
 
-  const approvedCount = rows.filter((r) => r.approvals.length > 0).length;
+  const approvedCount = rows.filter((r) => r.approvals.some((a) => a.approvalStatus === "Approved")).length;
 
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <PageHeader
           title="Message Templates"
-          description="SMS and WhatsApp templates, with per-merchant approvals once live on the provider."
+          description="SMS and WhatsApp templates, with approval submissions once live on the provider."
         />
         <TemplateForm />
       </div>
@@ -79,7 +75,7 @@ export default async function TemplatesPage({
 
       <div className="mb-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
         <StatCard icon={MessageSquareText} label="Templates" value={formatNumber(rows.length)} />
-        <StatCard icon={CheckCircle2} label="Approved for a Merchant" value={formatNumber(approvedCount)} />
+        <StatCard icon={CheckCircle2} label="Approved" value={formatNumber(approvedCount)} />
         <StatCard
           icon={LayoutList}
           label="Uncategorized"
@@ -87,7 +83,7 @@ export default async function TemplatesPage({
         />
       </div>
 
-      <TemplatesTable rows={rows} merchants={merchants} />
+      <TemplatesTable rows={rows} />
     </div>
   );
 }

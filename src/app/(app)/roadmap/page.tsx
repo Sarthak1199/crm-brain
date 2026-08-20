@@ -5,8 +5,9 @@ import { PageHeader } from "@/components/page-header";
 import { SyncStatusBar } from "@/components/sync-status-bar";
 import { RoadmapFilters } from "./roadmap-filters";
 import { RoadmapTable } from "./roadmap-table";
+import { RoadmapTicketForm } from "./roadmap-ticket-form";
 
-type SearchParams = { status?: string; priority?: string; theme?: string };
+type SearchParams = { status?: string; theme?: string };
 
 const PRIORITY_RANK: Record<string, number> = {
   P0: 0,
@@ -30,7 +31,6 @@ export default async function RoadmapPage({
 
   const where: Prisma.RoadmapItemWhereInput = {};
   if (params.status && params.status !== "all") where.status = params.status;
-  if (params.priority && params.priority !== "all") where.priority = params.priority;
   if (params.theme && params.theme !== "all") where.theme = params.theme;
 
   const [items, allItems] = await Promise.all([
@@ -47,19 +47,21 @@ export default async function RoadmapPage({
     });
 
   const statuses = Array.from(new Set(allItems.map((i) => i.status).filter(Boolean))).sort();
-  const priorities = Array.from(new Set(allItems.map((i) => i.priority).filter(Boolean))) as string[];
   const themes = Array.from(new Set(allItems.map((i) => i.theme).filter(Boolean))).sort() as string[];
 
   return (
     <div>
-      <PageHeader
-        title="Product Roadmap"
-        description="Synced from the CRM product team's roadmap sheet — click a row for the full brief."
-      />
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <PageHeader
+          title="Product Roadmap"
+          description="Synced from the CRM product team's roadmap sheet — click a row for the full brief."
+        />
+        <RoadmapTicketForm />
+      </div>
 
       <div className="sticky top-16 z-[5] -mx-6 mb-5 border-b border-border bg-background/95 px-6 py-3 backdrop-blur md:-mx-8 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <RoadmapFilters statuses={statuses} priorities={priorities} themes={themes} />
+          <RoadmapFilters statuses={statuses} themes={themes} />
           <SyncStatusBar />
         </div>
       </div>

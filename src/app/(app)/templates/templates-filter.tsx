@@ -15,9 +15,15 @@ const CATEGORY_OPTIONS = [
   { value: "Loyalty", label: "Loyalty" },
   { value: "Automation", label: "Automation" },
   { value: "Campaign", label: "Campaign" },
-  { value: "OTP", label: "OTP" },
   { value: "Utility", label: "Utility" },
   { value: "none", label: "Uncategorized" },
+];
+
+const HANDLE_OPTIONS = [
+  { value: "all", label: "All Handles" },
+  { value: "Merchant", label: "Merchant" },
+  { value: "RistaByDotpe", label: "Rista by DotPe" },
+  { value: "DotpeCRM", label: "DotPe CRM" },
 ];
 
 function FilterGroup({
@@ -56,6 +62,7 @@ export function TemplatesFilter() {
   const searchParams = useSearchParams();
   const activeChannel = searchParams.get("channel") ?? "all";
   const activeCategory = searchParams.get("category") ?? "all";
+  const activeHandle = searchParams.get("handle") ?? "all";
 
   const setParam = useCallback(
     (key: string, value: string) => {
@@ -71,6 +78,7 @@ export function TemplatesFilter() {
     <div className="flex flex-wrap items-center gap-2">
       <FilterGroup options={CHANNEL_OPTIONS} active={activeChannel} onSelect={(v) => setParam("channel", v)} />
       <FilterGroup options={CATEGORY_OPTIONS} active={activeCategory} onSelect={(v) => setParam("category", v)} />
+      <FilterGroup options={HANDLE_OPTIONS} active={activeHandle} onSelect={(v) => setParam("handle", v)} />
     </div>
   );
 }

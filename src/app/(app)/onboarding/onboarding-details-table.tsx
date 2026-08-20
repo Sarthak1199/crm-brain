@@ -15,6 +15,7 @@ import { useSort } from "@/hooks/use-sort";
 export type OnboardingMerchantRow = {
   id: string;
   brandName: string;
+  dotpeMid: string;
   totalStores: number;
   crmStatus: string;
   loyaltyStatus: string;
@@ -23,6 +24,7 @@ export type OnboardingMerchantRow = {
 
 const ACCESSORS = {
   brandName: (r: OnboardingMerchantRow) => r.brandName,
+  dotpeMid: (r: OnboardingMerchantRow) => r.dotpeMid,
   totalStores: (r: OnboardingMerchantRow) => r.totalStores,
   crmStatus: (r: OnboardingMerchantRow) => r.crmStatus,
   loyaltyStatus: (r: OnboardingMerchantRow) => r.loyaltyStatus,
@@ -41,6 +43,7 @@ export function OnboardingDetailsTable({ rows }: { rows: OnboardingMerchantRow[]
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <SortableHead label="Brand Name" sortKey="brandName" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
+            <SortableHead label="MID" sortKey="dotpeMid" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Branch Size" sortKey="totalStores" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
             <SortableHead label="CRM License" sortKey="crmStatus" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Loyalty License" sortKey="loyaltyStatus" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -50,7 +53,7 @@ export function OnboardingDetailsTable({ rows }: { rows: OnboardingMerchantRow[]
         <TableBody>
           {sorted.length === 0 ? (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={5} className="py-12 text-center text-[13px] text-muted-foreground">
+              <TableCell colSpan={6} className="py-12 text-center text-[13px] text-muted-foreground">
                 No merchants yet.
               </TableCell>
             </TableRow>
@@ -60,6 +63,7 @@ export function OnboardingDetailsTable({ rows }: { rows: OnboardingMerchantRow[]
                 <TableCell className="px-4 py-3.5 text-[13px] font-medium text-foreground">
                   {row.brandName}
                 </TableCell>
+                <TableCell className="px-4 py-3.5 text-[13px] text-muted-foreground">{row.dotpeMid}</TableCell>
                 <TableCell className="px-4 py-3.5 text-right text-[13px] text-foreground">
                   {formatNumber(row.totalStores)}
                 </TableCell>

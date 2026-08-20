@@ -12,6 +12,7 @@ export default async function OnboardingPage() {
       select: {
         id: true,
         brandName: true,
+        dotpeMid: true,
         totalStores: true,
         crmStatus: true,
         wabaStatus: true,
@@ -26,7 +27,13 @@ export default async function OnboardingPage() {
   ]);
 
   const requestsRaised = requests.length;
-  const licenseEnabled = requests.filter((r) => r.loyaltyEnabled || r.crmEnabled).length;
+  const crmLicenseEnabled = requests.filter((r) => r.crmEnabled).length;
+  const loyaltyLicenseEnabled = requests.filter((r) => r.loyaltyEnabled).length;
+  // wabaStatus is the app's existing "Marketing License" field (see the
+  // Merchant License Status table below) — no sync currently writes it, so
+  // this is honestly 0 until a real source for WhatsApp Business API status
+  // is wired up, rather than approximating it from an unrelated field.
+  const marketingLicenseEnabled = merchants.filter((m) => m.wabaStatus === "Active").length;
   const finalOnboarded = requests.filter(
     (r) => r.loyaltyEnabled && (!r.crmLicenseRequested || r.crmEnabled)
   ).length;
@@ -46,6 +53,7 @@ export default async function OnboardingPage() {
   const detailsRows = merchants.map((m) => ({
     id: m.id,
     brandName: m.brandName,
+    dotpeMid: m.dotpeMid,
     totalStores: m.totalStores,
     // Real CRM license state from Redash (query 10505's crm_status), not
     // usage. Loyalty is still the onboarding sheet's ops-confirmed write-back.
@@ -73,7 +81,9 @@ export default async function OnboardingPage() {
       <div className="mb-6">
         <OnboardingKpis
           requestsRaised={requestsRaised}
-          licenseEnabled={licenseEnabled}
+          crmLicenseEnabled={crmLicenseEnabled}
+          loyaltyLicenseEnabled={loyaltyLicenseEnabled}
+          marketingLicenseEnabled={marketingLicenseEnabled}
           finalOnboarded={finalOnboarded}
           requests={requestRows}
         />

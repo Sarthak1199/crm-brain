@@ -23,3 +23,21 @@ export const STATUS_TONES: Record<string, string> = {
 export function statusToneClass(status: string) {
   return STATUS_TONES[status] ?? "border-border bg-muted text-muted-foreground";
 }
+
+export type TicketLink = { number: string; url: string };
+
+/**
+ * ticketUrl is raw sheet text, sometimes multiple "1. url\n2. url" lines.
+ * Ticket numbers (e.g. "DM-22") aren't stored separately — they're the last
+ * path segment of each Jira URL (".../browse/DM-22"), so parse them from
+ * the URL itself rather than adding a column that doesn't exist in the
+ * source sheet.
+ */
+export function parseTicketLinks(raw: string | null): TicketLink[] {
+  if (!raw) return [];
+  const urls = raw.match(/https?:\/\/\S+/g) ?? [];
+  return urls.map((url) => {
+    const match = url.match(/\/([A-Z][A-Z0-9]*-\d+)(?:[/?#]|$)/);
+    return { number: match?.[1] ?? url, url };
+  });
+}

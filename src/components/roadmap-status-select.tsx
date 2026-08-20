@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { KNOWN_ROADMAP_STATUSES, statusToneClass } from "@/lib/roadmap-status";
 import { updateRoadmapStatus } from "@/app/(app)/roadmap/actions";
@@ -42,7 +42,11 @@ export function RoadmapStatusSelect({ id, status }: { id: string; status: string
         ))}
       </select>
       <span className="pointer-events-none">{value || "Unspecified"}</span>
-      {isPending ? <Loader2 className="pointer-events-none absolute right-1 size-2.5 animate-spin" /> : null}
+      {isPending ? (
+        <Loader2 className="pointer-events-none absolute right-1 size-2.5 animate-spin" />
+      ) : (
+        <ChevronDown className="pointer-events-none absolute right-1 size-2.5 opacity-60" />
+      )}
     </div>
   );
 }

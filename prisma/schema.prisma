@@ -68,56 +68,56 @@ model Merchant {
   id String @id @default(cuid())
 
   // Identity
-  ristaBrandId String? @unique
-  dotpeMid     String  @unique
-  brandName    String
-  pocName      String?
-  pocNumber    String?
+  ristaBrandId  String? @unique
+  dotpeMid      String  @unique
+  brandName     String
+  pocName       String?
+  pocNumber     String?
   // Join keys for the competitor branch-count sheet (Account Number / BusinessID, one row per merchant-provider pair)
   accountNumber String?
   businessId    String?
 
   // Footprint
   totalStores         Int @default(0)
-  activeDineInStores   Int @default(0)
-  loyaltyActiveStores  Int @default(0)
-  paidBranches         Int @default(0)
-  closedBranches       Int @default(0)
+  activeDineInStores  Int @default(0)
+  loyaltyActiveStores Int @default(0)
+  paidBranches        Int @default(0)
+  closedBranches      Int @default(0)
 
   // Commercials
-  paymentCollectedDate  DateTime?
-  closureDate           DateTime?
-  paymentCollected      Decimal   @default(0) @db.Decimal(14, 2)
+  paymentCollectedDate DateTime?
+  closureDate          DateTime?
+  paymentCollected     Decimal   @default(0) @db.Decimal(14, 2)
   // computed = activeDineInStores * 10000, kept in sync on write
-  totalYearlyPotential  Decimal   @default(0) @db.Decimal(14, 2)
-  subscriptionRevenue   Decimal   @default(0) @db.Decimal(14, 2)
-  creditConsumedL30     Decimal   @default(0) @db.Decimal(14, 2)
+  totalYearlyPotential Decimal   @default(0) @db.Decimal(14, 2)
+  subscriptionRevenue  Decimal   @default(0) @db.Decimal(14, 2)
+  creditConsumedL30    Decimal   @default(0) @db.Decimal(14, 2)
 
   // Competitor presence (branch counts on DotPe CRM's product surface)
   reeloBranches       Int @default(0)
-  xenoBranches         Int @default(0)
-  dotpeBranches        Int @default(0)
-  fudrBranches         Int @default(0)
-  easyrewardsBranches  Int @default(0)
+  xenoBranches        Int @default(0)
+  dotpeBranches       Int @default(0)
+  fudrBranches        Int @default(0)
+  easyrewardsBranches Int @default(0)
 
   // Sales / CRM status
-  crmTarget      CrmTarget      @default(Maybe)
-  lastDemoStatus DateTime?
-  crmStatus      CrmStatus      @default(NA)
-  crmEnabledOn   DateTime?
+  crmTarget              CrmTarget     @default(Maybe)
+  lastDemoStatus         DateTime?
+  crmStatus              CrmStatus     @default(NA)
+  crmEnabledOn           DateTime?
   // "CRM Activation Status" column, CRM+Loyalty closures tab — the ops-confirmed
   // signal for the dashboard's "Paid" funnel count (crmStatus alone over-counts
   // from Redash's broader crm_merchants table, which includes non-closed rows).
-  crmActivationConfirmed Boolean @default(false)
-  loyaltyStatus  LoyaltyStatus  @default(Inactive)
-  wabaStatus     WabaStatus     @default(Inactive)
-  onboarded      OnboardStatus  @default(NotOnboarded)
-  ristaStatus    RistaStatus    @default(Inactive)
-  dotpeStatus    DotpeStatus    @default(Inactive)
+  crmActivationConfirmed Boolean       @default(false)
+  loyaltyStatus          LoyaltyStatus @default(Inactive)
+  wabaStatus             WabaStatus    @default(Inactive)
+  onboarded              OnboardStatus @default(NotOnboarded)
+  ristaStatus            RistaStatus   @default(Inactive)
+  dotpeStatus            DotpeStatus   @default(Inactive)
 
   // Usage
-  customerCount           Int     @default(0)
-  l30Txn                  Int     @default(0)
+  customerCount            Int     @default(0)
+  l30Txn                   Int     @default(0)
   preCrmCredits            Decimal @default(0) @db.Decimal(14, 2)
   postCrmCredits           Decimal @default(0) @db.Decimal(14, 2)
   momCreditConsumption     Decimal @default(0) @db.Decimal(14, 2)
@@ -130,9 +130,9 @@ model Merchant {
   loyaltyPointsBurned Int     @default(0)
 
   // Automations
-  automationsRules          Json?
-  automationsActivateDate   DateTime?
-  automationsTotalSent      Int       @default(0)
+  automationsRules        Json?
+  automationsActivateDate DateTime?
+  automationsTotalSent    Int       @default(0)
 
   // Campaigns
   campaignsSetup           Int @default(0)
@@ -140,8 +140,8 @@ model Merchant {
   campaignsUsingRfm        Int @default(0)
 
   // Support
-  bugRaised       String?
-  featureRequest  String?
+  bugRaised      String?
+  featureRequest String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -149,7 +149,6 @@ model Merchant {
   snapshots          MerchantSnapshot[]
   supportRequests    SupportRequest[]
   onboardingRequests OnboardingRequest[]
-  templateApprovals  TemplateApproval[]
 
   @@index([brandName])
   @@index([crmStatus])
@@ -222,21 +221,26 @@ model SupportRequest {
 }
 
 model RoadmapItem {
-  id             String    @id @default(cuid())
-  theme          String?
-  title          String
-  ticketUrl      String? // raw multi-line "1. url\n2. url" text as stored in the sheet
-  design         String? // free text — values are inconsistent in source ("✅" / "Required" / "Not required" / "Not reqd")
-  rista          String? // "Needed" or blank
-  priority       String? // P0/P1/P2/P3/"Picked"/blank
-  usp            Boolean   @default(false)
-  status         String // primary filter/category — Shipped / Feature / Merchant ask / New Product / Bug / blank; not a strict enum
-  goLiveDate     String? // often not a clean date (e.g. "Sept"), stored as free text
-  manpowerWeeks  Decimal?  @db.Decimal(6, 2)
-  description    String?
-  brandSignal    String?
-  why            String?
-  syncedAt       DateTime  @default(now()) @updatedAt
+  id               String   @id @default(cuid())
+  theme            String?
+  title            String
+  ticketUrl        String? // raw multi-line "1. url\n2. url" text as stored in the sheet; ticket number (e.g. DM-123) is parsed from this at render time, not stored separately
+  design           String? // free text — values are inconsistent in source ("✅" / "Required" / "Not required" / "Not reqd"); manually-created tickets store a design link here instead
+  designAttachment String? // uploaded file path, for manually-created tickets whose "Design" is an attachment rather than a link
+  rista            String? // "Needed" or blank
+  priority         String? // P0/P1/P2/P3/"Picked"/blank
+  usp              Boolean  @default(false)
+  status           String // primary filter/category — Shipped / Feature / Merchant ask / New Product / Bug / blank; not a strict enum
+  goLiveDate       String? // often not a clean date (e.g. "Sept"), stored as free text
+  manpowerWeeks    Decimal? @db.Decimal(6, 2)
+  description      String?
+  brandSignal      String?
+  why              String?
+  // Sheet-sourced rows are fully replaced on every sync (the sheet is the
+  // source of truth for those); manually-created "product ticket" rows are
+  // never touched by the sync so ops-entered tickets survive it.
+  isManual         Boolean  @default(false)
+  syncedAt         DateTime @default(now()) @updatedAt
 
   @@index([status])
   @@index([priority])
@@ -249,26 +253,26 @@ model RoadmapItem {
 // never writes, only reads back on sync. sheetRowIndex is the join key: it's
 // stable across syncs since the sheet is append-only, never reordered.
 model OnboardingRequest {
-  id         String    @id @default(cuid())
-  sheetRowIndex Int    @unique
-  timestamp  DateTime?
-  email      String?
-  businessName String?
+  id            String    @id @default(cuid())
+  sheetRowIndex Int       @unique
+  timestamp     DateTime?
+  email         String?
+  businessName  String?
 
   merchantId String?
   merchant   Merchant? @relation(fields: [merchantId], references: [id], onDelete: SetNull)
 
   enterpriseMerchantId String? // "MerchantID (enterprise):" — matched to Merchant.dotpeMid where possible
-  ristaBusinessId       String? // "BusinessID (rista):"
-  ristaBrandId          String? // "BrandID (rista):"
-  ristaBranchId         String? // "BranchID (rista):"
-  branchCode            String?
-  storeCode             String?
-  enterpriseStoreId     String? // "StoreId (enterprise):"
+  ristaBusinessId      String? // "BusinessID (rista):"
+  ristaBrandId         String? // "BrandID (rista):"
+  ristaBranchId        String? // "BranchID (rista):"
+  branchCode           String?
+  storeCode            String?
+  enterpriseStoreId    String? // "StoreId (enterprise):"
 
-  loyaltyType String? // "Visit based loyalty" / "Point based loyalty" (free text — values seen in source)
-  automation  Boolean @default(false)
-  dotpeUsername String?
+  loyaltyType         String? // "Visit based loyalty" / "Point based loyalty" (free text — values seen in source)
+  automation          Boolean @default(false)
+  dotpeUsername       String?
   crmLicenseRequested Boolean @default(false) // "CRM license enable?"
 
   // BE write-back — this app reads these, never sets them
@@ -298,12 +302,23 @@ enum TemplateDealType {
   WithoutDeal
 }
 
+// OTP was merged into Utility (single "Utility" catch-all going forward,
+// per an explicit spec update) — existing OTP rows are remapped to Utility
+// in the migration, not left dangling under a removed enum value.
 enum TemplateCategory {
   Loyalty
   Automation
   Campaign
-  OTP
   Utility
+}
+
+// Which WhatsApp Business/Meta account this template is submitted under —
+// the same message can be independently submitted per handle, each with its
+// own approval lifecycle (see TemplateApproval).
+enum TemplateHandle {
+  Merchant
+  RistaByDotpe
+  DotpeCRM
 }
 
 // category is nullable because the initial import (from the "automation_templates.csv"
@@ -316,6 +331,7 @@ model Template {
   dealType    TemplateDealType
   messageText String
   category    TemplateCategory?
+  handle      TemplateHandle?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -325,19 +341,24 @@ model Template {
   @@index([category])
 }
 
-// One row per (template, merchant) pair: the same abstract template can be
-// approved for multiple merchants, each with its own provider (WhatsApp
-// Business/Meta) template ID — that ID is not shared across merchants even
-// when the underlying message text is identical.
-model TemplateApproval {
-  id                 String   @id @default(cuid())
-  templateId         String
-  template           Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  merchantId         String
-  merchant           Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  providerTemplateId String
-  createdAt          DateTime @default(now())
+enum TemplateApprovalStatus {
+  Submitted
+  Approved
+}
 
-  @@unique([templateId, merchantId])
-  @@index([merchantId])
+// A submission-lifecycle record for the template as a whole (not tied to
+// any one merchant) — e.g. "submitted to WhatsApp for review under this
+// Handle, got approved, here's the Event ID and Template ID". A template
+// can have multiple submission records (resubmissions, or separate
+// submissions per Handle).
+model TemplateApproval {
+  id                 String                 @id @default(cuid())
+  templateId         String
+  template           Template               @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  approvalStatus     TemplateApprovalStatus @default(Submitted)
+  eventId            String?
+  providerTemplateId String? // "Template ID" in the UI — assigned once approved, so nullable
+  createdAt          DateTime               @default(now())
+
+  @@index([templateId])
 }

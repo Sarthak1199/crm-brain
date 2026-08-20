@@ -18,7 +18,14 @@ import {
 
 export type Channel = "SMS" | "WhatsApp";
 export type DealType = "WithDeal" | "WithoutDeal";
-export type Category = "Loyalty" | "Automation" | "Campaign" | "OTP" | "Utility";
+export type Category = "Loyalty" | "Automation" | "Campaign" | "Utility";
+export type Handle = "Merchant" | "RistaByDotpe" | "DotpeCRM";
+
+export const HANDLE_LABELS: Record<Handle, string> = {
+  Merchant: "Merchant",
+  RistaByDotpe: "Rista by DotPe",
+  DotpeCRM: "DotPe CRM",
+};
 
 export type ExistingTemplate = {
   id: string;
@@ -26,6 +33,7 @@ export type ExistingTemplate = {
   dealType: DealType;
   messageText: string;
   category: Category | null;
+  handle: Handle | null;
 };
 
 export function TemplateForm({
@@ -47,6 +55,7 @@ export function TemplateForm({
   const [channel, setChannel] = useState<Channel | "">(existing?.channel ?? "");
   const [dealType, setDealType] = useState<DealType | "">(existing?.dealType ?? "");
   const [category, setCategory] = useState<Category | "">(existing?.category ?? "");
+  const [handle, setHandle] = useState<Handle | "">(existing?.handle ?? "");
   const [messageText, setMessageText] = useState(existing?.messageText ?? "");
 
   const action = isEdit ? updateTemplate.bind(null, existing.id) : createTemplate;
@@ -58,6 +67,7 @@ export function TemplateForm({
       setChannel("");
       setDealType("");
       setCategory("");
+      setHandle("");
       setMessageText("");
     }
   }
@@ -82,7 +92,7 @@ export function TemplateForm({
         <DialogDescription>
           {isEdit
             ? "Update the template text or reclassify it."
-            : "Create a template for SMS or WhatsApp. Merchant approvals are added separately once approved."}
+            : "Create a template for SMS or WhatsApp. Approval submissions are added separately."}
         </DialogDescription>
       </DialogHeader>
 
@@ -90,6 +100,7 @@ export function TemplateForm({
         <input type="hidden" name="channel" value={channel} />
         <input type="hidden" name="dealType" value={dealType} />
         <input type="hidden" name="category" value={category} />
+        <input type="hidden" name="handle" value={handle} />
 
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
@@ -118,20 +129,34 @@ export function TemplateForm({
           </div>
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-[13px] font-medium text-foreground">Category</Label>
-          <Select value={category} onValueChange={(v) => setCategory(v as Category)}>
-            <SelectTrigger className="h-9 rounded-lg text-[13px]">
-              <SelectValue placeholder="Select category..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Loyalty">Loyalty</SelectItem>
-              <SelectItem value="Automation">Automation</SelectItem>
-              <SelectItem value="Campaign">Campaign</SelectItem>
-              <SelectItem value="OTP">OTP</SelectItem>
-              <SelectItem value="Utility">Utility</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-[13px] font-medium text-foreground">Category</Label>
+            <Select value={category} onValueChange={(v) => setCategory(v as Category)}>
+              <SelectTrigger className="h-9 rounded-lg text-[13px]">
+                <SelectValue placeholder="Select category..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Loyalty">Loyalty</SelectItem>
+                <SelectItem value="Automation">Automation</SelectItem>
+                <SelectItem value="Campaign">Campaign</SelectItem>
+                <SelectItem value="Utility">Utility</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-[13px] font-medium text-foreground">Handle</Label>
+            <Select value={handle} onValueChange={(v) => setHandle(v as Handle)}>
+              <SelectTrigger className="h-9 rounded-lg text-[13px]">
+                <SelectValue placeholder="Select handle..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Merchant">Merchant</SelectItem>
+                <SelectItem value="RistaByDotpe">Rista by DotPe</SelectItem>
+                <SelectItem value="DotpeCRM">DotPe CRM</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="flex flex-col gap-1.5">

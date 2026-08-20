@@ -14,26 +14,40 @@ import { Badge } from "@/components/ui/badge";
 import { Section } from "@/components/detail-panel";
 import { formatDate } from "@/lib/format";
 import { deleteTemplate, deleteTemplateApproval } from "./actions";
-import { TemplateForm } from "./template-form";
-import { AddApprovalForm } from "./add-approval-form";
+import { TemplateForm, HANDLE_LABELS } from "./template-form";
+import { ApprovalForm } from "./approval-form";
 import type { TemplateRow } from "./templates-table";
+
+function ApprovalStatusBadge({ status }: { status: "Submitted" | "Approved" }) {
+  return (
+    <Badge
+      variant="outline"
+      className={
+        status === "Approved"
+          ? "border-positive/20 bg-positive/10 text-[11px] text-positive-foreground"
+          : "text-[11px] text-muted-foreground"
+      }
+    >
+      {status}
+    </Badge>
+  );
+}
 
 export function TemplateDetailSheet({
   row,
-  merchants,
   onOpenChange,
 }: {
   row: TemplateRow | null;
-  merchants: { id: string; brandName: string; dotpeMid: string }[];
   onOpenChange: (open: boolean) => void;
 }) {
   const [editOpen, setEditOpen] = useState(false);
+  const [editingApprovalId, setEditingApprovalId] = useState<string | null>(null);
   const [isDeleting, startDelete] = useTransition();
   const [deletingApprovalId, setDeletingApprovalId] = useState<string | null>(null);
 
   function handleDelete() {
     if (!row) return;
-    if (!window.confirm("Delete this template? Its merchant approvals will be removed too.")) return;
+    if (!window.confirm("Delete this template? Its approval submissions will be removed too.")) return;
     startDelete(async () => {
       await deleteTemplate(row.id);
       onOpenChange(false);
@@ -41,7 +55,7 @@ export function TemplateDetailSheet({
   }
 
   function handleDeleteApproval(approvalId: string) {
-    if (!window.confirm("Remove this merchant approval?")) return;
+    if (!window.confirm("Remove this approval submission?")) return;
     setDeletingApprovalId(approvalId);
     startDelete(async () => {
       await deleteTemplateApproval(approvalId);
@@ -57,7 +71,7 @@ export function TemplateDetailSheet({
             <>
               <SheetHeader className="border-b border-border pb-4">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <SheetTitle className="text-[18px]">{row.channel}</SheetTitle>
                     <span className="text-[13px] text-muted-foreground">
                       {row.dealType === "WithDeal" ? "With Deal" : "Without Deal"}
@@ -65,6 +79,11 @@ export function TemplateDetailSheet({
                     {row.category ? (
                       <Badge variant="outline" className="text-[11px]">
                         {row.category}
+                      </Badge>
+                    ) : null}
+                    {row.handle ? (
+                      <Badge variant="outline" className="text-[11px]">
+                        {HANDLE_LABELS[row.handle]}
                       </Badge>
                     ) : null}
                   </div>
@@ -104,42 +123,54 @@ export function TemplateDetailSheet({
 
                 <div className="py-5">
                   <h3 className="mb-3 text-[13px] font-semibold text-foreground">
-                    Merchant Approvals ({row.approvals.length})
+                    Approval Submissions ({row.approvals.length})
                   </h3>
 
                   {row.approvals.length > 0 ? (
                     <div className="mb-3 flex flex-col gap-1.5">
-                      {row.approvals.map((a) => (
-                        <div
-                          key={a.id}
-                          className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-[13px] font-medium text-foreground">
-                              {a.merchant.brandName}
-                            </p>
-                            <p className="truncate text-[12px] text-muted-foreground">
-                              {a.merchant.dotpeMid} · Template ID: {a.providerTemplateId}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            disabled={deletingApprovalId === a.id}
-                            onClick={() => handleDeleteApproval(a.id)}
-                            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-negative/10 hover:text-negative-foreground"
+                      {row.approvals.map((a) =>
+                        editingApprovalId === a.id ? (
+                          <ApprovalForm
+                            key={a.id}
+                            templateId={row.id}
+                            existing={a}
+                            onSuccess={() => setEditingApprovalId(null)}
+                            onCancel={() => setEditingApprovalId(null)}
+                          />
+                        ) : (
+                          <div
+                            key={a.id}
+                            className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 hover:bg-muted/40"
+                            onClick={() => setEditingApprovalId(a.id)}
                           >
-                            <X className="size-3.5" />
-                          </button>
-                        </div>
-                      ))}
+                            <div className="flex min-w-0 items-center gap-2">
+                              <ApprovalStatusBadge status={a.approvalStatus} />
+                              <p className="truncate text-[12px] text-muted-foreground">
+                                {[a.eventId ? `Event: ${a.eventId}` : null, a.providerTemplateId ? `Template ID: ${a.providerTemplateId}` : null]
+                                  .filter(Boolean)
+                                  .join(" · ") || "No IDs recorded yet"}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={deletingApprovalId === a.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteApproval(a.id);
+                              }}
+                              className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-negative/10 hover:text-negative-foreground"
+                            >
+                              <X className="size-3.5" />
+                            </button>
+                          </div>
+                        )
+                      )}
                     </div>
                   ) : (
-                    <p className="mb-3 text-[13px] text-muted-foreground">
-                      No merchants approved for this template yet.
-                    </p>
+                    <p className="mb-3 text-[13px] text-muted-foreground">No approval submissions yet.</p>
                   )}
 
-                  <AddApprovalForm templateId={row.id} merchants={merchants} />
+                  <ApprovalForm templateId={row.id} />
                 </div>
               </div>
             </>
@@ -155,6 +186,7 @@ export function TemplateDetailSheet({
             dealType: row.dealType,
             messageText: row.messageText,
             category: row.category,
+            handle: row.handle,
           }}
           onSuccess={() => onOpenChange(false)}
           open={editOpen}

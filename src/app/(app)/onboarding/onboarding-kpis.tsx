@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, KeyRound, CheckCircle2 } from "lucide-react";
+import { FileText, KeyRound, Gift, Megaphone, CheckCircle2 } from "lucide-react";
 import { StatCard } from "@/components/stat-card";
 import { formatNumber } from "@/lib/format";
 import { CHART_SOURCES } from "@/lib/sync/source-links";
@@ -9,31 +9,46 @@ import { OnboardingRequestsPanel, type OnboardingRequestRow } from "./onboarding
 
 export function OnboardingKpis({
   requestsRaised,
-  licenseEnabled,
+  crmLicenseEnabled,
+  loyaltyLicenseEnabled,
+  marketingLicenseEnabled,
   finalOnboarded,
   requests,
 }: {
   requestsRaised: number;
-  licenseEnabled: number;
+  crmLicenseEnabled: number;
+  loyaltyLicenseEnabled: number;
+  marketingLicenseEnabled: number;
   finalOnboarded: number;
   requests: OnboardingRequestRow[];
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
 
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 lg:grid-cols-5">
       <StatCard
         icon={FileText}
-        label="Requests Raised"
+        label="Request Raised"
         value={formatNumber(requestsRaised)}
         sources={CHART_SOURCES.onboarding}
         onViewDetails={() => setPanelOpen(true)}
       />
       <StatCard
         icon={KeyRound}
-        label="License Enabled"
-        value={formatNumber(licenseEnabled)}
+        label="CRM License Enabled"
+        value={formatNumber(crmLicenseEnabled)}
         sources={CHART_SOURCES.onboarding}
+      />
+      <StatCard
+        icon={Gift}
+        label="Loyalty License Enabled"
+        value={formatNumber(loyaltyLicenseEnabled)}
+        sources={CHART_SOURCES.onboarding}
+      />
+      <StatCard
+        icon={Megaphone}
+        label="Marketing License Enabled"
+        value={formatNumber(marketingLicenseEnabled)}
       />
       <StatCard
         icon={CheckCircle2}

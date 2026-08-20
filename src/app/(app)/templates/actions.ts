@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Prisma, TemplateChannel, TemplateDealType, TemplateCategory } from "@prisma/client";
+import { TemplateChannel, TemplateDealType, TemplateCategory, TemplateHandle, TemplateApprovalStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 function parseTemplateFields(formData: FormData) {
@@ -9,6 +9,7 @@ function parseTemplateFields(formData: FormData) {
   const dealType = formData.get("dealType");
   const messageText = formData.get("messageText");
   const category = formData.get("category");
+  const handle = formData.get("handle");
 
   if (channel !== "SMS" && channel !== "WhatsApp") {
     return { error: "Select a channel." } as const;
@@ -19,14 +20,11 @@ function parseTemplateFields(formData: FormData) {
   if (typeof messageText !== "string" || !messageText.trim()) {
     return { error: "Message text is required." } as const;
   }
-  if (
-    category !== "Loyalty" &&
-    category !== "Automation" &&
-    category !== "Campaign" &&
-    category !== "OTP" &&
-    category !== "Utility"
-  ) {
+  if (category !== "Loyalty" && category !== "Automation" && category !== "Campaign" && category !== "Utility") {
     return { error: "Select a category." } as const;
+  }
+  if (handle !== "Merchant" && handle !== "RistaByDotpe" && handle !== "DotpeCRM") {
+    return { error: "Select a handle." } as const;
   }
 
   return {
@@ -35,6 +33,7 @@ function parseTemplateFields(formData: FormData) {
       dealType: dealType as TemplateDealType,
       messageText: messageText.trim(),
       category: category as TemplateCategory,
+      handle: handle as TemplateHandle,
     },
   } as const;
 }
@@ -74,33 +73,54 @@ export async function addTemplateApproval(
   _prevState: string | undefined,
   formData: FormData
 ): Promise<string | undefined> {
-  const merchantId = formData.get("merchantId");
+  const approvalStatus = formData.get("approvalStatus");
+  const eventId = formData.get("eventId");
   const providerTemplateId = formData.get("providerTemplateId");
 
-  if (typeof merchantId !== "string" || !merchantId) {
-    return "Select a merchant.";
-  }
-  if (typeof providerTemplateId !== "string" || !providerTemplateId.trim()) {
-    return "Provider template ID is required.";
+  if (approvalStatus !== "Submitted" && approvalStatus !== "Approved") {
+    return "Select an approval status.";
   }
 
-  const [template, merchant] = await Promise.all([
-    prisma.template.findUnique({ where: { id: templateId } }),
-    prisma.merchant.findUnique({ where: { id: merchantId } }),
-  ]);
+  const template = await prisma.template.findUnique({ where: { id: templateId } });
   if (!template) return "Template not found.";
-  if (!merchant) return "Merchant not found.";
 
-  try {
-    await prisma.templateApproval.create({
-      data: { templateId, merchantId, providerTemplateId: providerTemplateId.trim() },
-    });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return "This merchant already has an approval recorded for this template.";
-    }
-    throw error;
+  await prisma.templateApproval.create({
+    data: {
+      templateId,
+      approvalStatus: approvalStatus as TemplateApprovalStatus,
+      eventId: typeof eventId === "string" && eventId.trim() ? eventId.trim() : null,
+      providerTemplateId: typeof providerTemplateId === "string" && providerTemplateId.trim() ? providerTemplateId.trim() : null,
+    },
+  });
+
+  revalidatePath("/templates");
+  return undefined;
+}
+
+export async function updateTemplateApproval(
+  approvalId: string,
+  _prevState: string | undefined,
+  formData: FormData
+): Promise<string | undefined> {
+  const approvalStatus = formData.get("approvalStatus");
+  const eventId = formData.get("eventId");
+  const providerTemplateId = formData.get("providerTemplateId");
+
+  if (approvalStatus !== "Submitted" && approvalStatus !== "Approved") {
+    return "Select an approval status.";
   }
+
+  const existing = await prisma.templateApproval.findUnique({ where: { id: approvalId } });
+  if (!existing) return "Approval record not found.";
+
+  await prisma.templateApproval.update({
+    where: { id: approvalId },
+    data: {
+      approvalStatus: approvalStatus as TemplateApprovalStatus,
+      eventId: typeof eventId === "string" && eventId.trim() ? eventId.trim() : null,
+      providerTemplateId: typeof providerTemplateId === "string" && providerTemplateId.trim() ? providerTemplateId.trim() : null,
+    },
+  });
 
   revalidatePath("/templates");
   return undefined;

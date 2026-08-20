@@ -29,6 +29,7 @@ export type OnboardingRequestRow = {
 
 const ACCESSORS = {
   businessName: (r: OnboardingRequestRow) => r.businessName,
+  enterpriseMerchantId: (r: OnboardingRequestRow) => r.enterpriseMerchantId,
   loyaltyType: (r: OnboardingRequestRow) => r.loyaltyType,
   loyaltyEnabled: (r: OnboardingRequestRow) => (r.loyaltyEnabled ? 1 : 0),
   crmEnabled: (r: OnboardingRequestRow) => (r.crmEnabled ? 1 : 0),
@@ -94,6 +95,7 @@ export function OnboardingRequestsPanel({
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <SortableHead label="Business" sortKey="businessName" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableHead label="MID" sortKey="enterpriseMerchantId" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableHead label="Loyalty Type" sortKey="loyaltyType" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableHead label="Loyalty" sortKey="loyaltyEnabled" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableHead label="CRM" sortKey="crmEnabled" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -103,7 +105,7 @@ export function OnboardingRequestsPanel({
               <TableBody>
                 {sorted.length === 0 ? (
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={5} className="py-10 text-center text-[13px] text-muted-foreground">
+                    <TableCell colSpan={6} className="py-10 text-center text-[13px] text-muted-foreground">
                       No matches.
                     </TableCell>
                   </TableRow>
@@ -117,6 +119,9 @@ export function OnboardingRequestsPanel({
                             via platform
                           </span>
                         ) : null}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-[13px] text-muted-foreground">
+                        {r.enterpriseMerchantId ?? "—"}
                       </TableCell>
                       <TableCell className="px-4 py-3 text-[13px] text-muted-foreground">
                         {r.loyaltyType ?? "—"}

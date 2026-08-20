@@ -13,13 +13,9 @@ import {
 import { SortableHead } from "@/components/sortable-head";
 import { RoadmapStatusSelect } from "@/components/roadmap-status-select";
 import { useSort } from "@/hooks/use-sort";
+import { parseTicketLinks } from "@/lib/roadmap-status";
 import type { SerializedRoadmapItem } from "@/lib/serialize";
 import { RoadmapDetailSheet } from "./roadmap-detail-sheet";
-
-function firstTicketLink(raw: string | null) {
-  if (!raw) return null;
-  return raw.match(/https?:\/\/\S+/)?.[0] ?? null;
-}
 
 const ACCESSORS = {
   title: (r: SerializedRoadmapItem) => r.title,
@@ -57,7 +53,7 @@ export function RoadmapTable({ rows }: { rows: SerializedRoadmapItem[] }) {
             </TableRow>
           ) : (
             sorted.map((item) => {
-              const ticket = firstTicketLink(item.ticketUrl);
+              const tickets = parseTicketLinks(item.ticketUrl);
               return (
                 <TableRow key={item.id} onClick={() => setSelected(item)} className="cursor-pointer">
                   <TableCell className="max-w-xs px-4 py-3.5 text-[13px] font-medium text-foreground">
@@ -69,17 +65,22 @@ export function RoadmapTable({ rows }: { rows: SerializedRoadmapItem[] }) {
                   </TableCell>
                   <TableCell className="px-4 py-3.5 text-[13px] text-foreground">{item.design ?? "—"}</TableCell>
                   <TableCell className="px-4 py-3.5">
-                    {ticket ? (
-                      <a
-                        href={ticket}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 text-[12px] text-primary underline decoration-dotted underline-offset-2 hover:text-primary/80"
-                      >
-                        Ticket
-                        <ExternalLink className="size-3" />
-                      </a>
+                    {tickets.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {tickets.map((t) => (
+                          <a
+                            key={t.url}
+                            href={t.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-[12px] text-primary underline decoration-dotted underline-offset-2 hover:text-primary/80"
+                          >
+                            {t.number}
+                            <ExternalLink className="size-3" />
+                          </a>
+                        ))}
+                      </div>
                     ) : (
                       <span className="text-[12px] text-muted-foreground/60">—</span>
                     )}
