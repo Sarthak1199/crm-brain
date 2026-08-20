@@ -5,6 +5,11 @@ import { isGsheetsConfigured } from "@/lib/gsheets";
 import { syncRedash } from "@/lib/sync/sync-redash";
 import { syncGsheets } from "@/lib/sync/sync-gsheets";
 
+// Runs both syncs sequentially — the Redash side alone has taken 5-6+
+// minutes in practice. Requires a Vercel plan that supports long function
+// durations (Hobby hard-caps at 60s regardless of this setting).
+export const maxDuration = 300;
+
 export async function POST() {
   const session = await auth();
   if (!session?.user || session.user.role !== "ADMIN") {

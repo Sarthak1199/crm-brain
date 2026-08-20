@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { isRedashConfigured } from "@/lib/redash";
 import { syncRedash } from "@/lib/sync/sync-redash";
 
+// The full Redash sync (crmAdoption + the 13-call credit-consumption-by-week
+// loop + everything else) has run 5-6+ minutes in practice — well past
+// Vercel's default function timeout. Requires a plan that supports this
+// (Pro or higher); Hobby hard-caps at 60s regardless of this setting.
+export const maxDuration = 300;
+
 function isAuthorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false; // never authorize against an unset secret

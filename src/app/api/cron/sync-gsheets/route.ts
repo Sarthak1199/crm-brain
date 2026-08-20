@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { isGsheetsConfigured } from "@/lib/gsheets";
 import { syncGsheets } from "@/lib/sync/sync-gsheets";
 
+export const maxDuration = 120;
+
 function isAuthorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false; // never authorize against an unset secret
