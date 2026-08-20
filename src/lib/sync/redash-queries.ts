@@ -75,12 +75,15 @@ export type CreditConsumptionBreakupRow = {
   "Loyalty (₹)": number;
 };
 
-// Returns one row per merchant with the CUMULATIVE total for the trailing
-// `weekCount` weeks — not a per-week series. weekCount is a Redash "text"
-// param, so it must be passed as a string or the request 400s.
-export async function fetchCreditConsumptionBreakup(weekCount: number) {
+// Returns one row per merchant totaled over [start, end]. The query was
+// originally a "trailing weekCount weeks" cumulative param (weekCount, text
+// type) but was changed upstream in Redash to an explicit date_range param —
+// passing weekCount now 400s with "incompatible with their definitions".
+// An explicit window is actually simpler for us: each call already returns
+// that window's own total, no cumulative-diffing needed.
+export async function fetchCreditConsumptionBreakup(start: Date, end: Date) {
   const rows = await runRedashQuery(REDASH_QUERY_IDS.creditConsumptionBreakup, {
-    weekCount: String(weekCount),
+    date_range: { start: `${isoDate(start)} 00:00:00`, end: `${isoDate(end)} 23:59:59` },
   });
   return rows as unknown as CreditConsumptionBreakupRow[];
 }

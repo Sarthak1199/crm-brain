@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import {
   fetchAutomationPerformance,
   fetchCrmAdoption,
@@ -7,7 +8,6 @@ import {
   fetchCrmWeeklyTrend,
   fetchLoyaltyFunnel,
   fetchLoyaltyMessages,
-  type CreditConsumptionBreakupRow,
 } from "./redash-queries";
 import { normalizeMid } from "./mid";
 import { withSyncRun, runStep } from "./sync-run";
@@ -51,36 +51,66 @@ export async function syncCrmAdoption() {
     const licenseStatus = mapCrmLicenseStatus(row.crm_status);
     const isActive = licenseStatus === "Active";
 
+    const upsertData = {
+      create: {
+        dotpeMid,
+        ristaBrandId: row.brand_id,
+        brandName: row.merchant_name,
+        crmEnabledOn: row.crm_enabled_at ? new Date(row.crm_enabled_at) : null,
+        crmStatus: licenseStatus,
+        crmTarget: "Yes" as const,
+        onboarded: isActive ? "Onboarded" as const : "NotOnboarded" as const,
+        campaignsSetup: row.total_campaigns ?? 0,
+        campaignsUsingRfm: row.campaigns_using_rfm ?? 0,
+        campaignsContactsReached: row.total_contacts_reached ?? 0,
+        totalContactsReached: row.total_contacts_reached ?? 0,
+      },
+      update: {
+        ristaBrandId: row.brand_id,
+        brandName: row.merchant_name,
+        crmEnabledOn: row.crm_enabled_at ? new Date(row.crm_enabled_at) : undefined,
+        crmStatus: licenseStatus,
+        onboarded: isActive ? ("Onboarded" as const) : undefined,
+        campaignsSetup: row.total_campaigns ?? 0,
+        campaignsUsingRfm: row.campaigns_using_rfm ?? 0,
+        campaignsContactsReached: row.total_contacts_reached ?? 0,
+        totalContactsReached: row.total_contacts_reached ?? 0,
+      },
+    };
+
     try {
-      await prisma.merchant.upsert({
-        where: { dotpeMid },
-        create: {
-          dotpeMid,
-          ristaBrandId: row.brand_id,
-          brandName: row.merchant_name,
-          crmEnabledOn: row.crm_enabled_at ? new Date(row.crm_enabled_at) : null,
-          crmStatus: licenseStatus,
-          crmTarget: "Yes",
-          onboarded: isActive ? "Onboarded" : "NotOnboarded",
-          campaignsSetup: row.total_campaigns ?? 0,
-          campaignsUsingRfm: row.campaigns_using_rfm ?? 0,
-          campaignsContactsReached: row.total_contacts_reached ?? 0,
-          totalContactsReached: row.total_contacts_reached ?? 0,
-        },
-        update: {
-          ristaBrandId: row.brand_id,
-          brandName: row.merchant_name,
-          crmEnabledOn: row.crm_enabled_at ? new Date(row.crm_enabled_at) : undefined,
-          crmStatus: licenseStatus,
-          onboarded: isActive ? "Onboarded" : undefined,
-          campaignsSetup: row.total_campaigns ?? 0,
-          campaignsUsingRfm: row.campaigns_using_rfm ?? 0,
-          campaignsContactsReached: row.total_contacts_reached ?? 0,
-          totalContactsReached: row.total_contacts_reached ?? 0,
-        },
-      });
+      await prisma.merchant.upsert({ where: { dotpeMid }, ...upsertData });
       count++;
     } catch (error) {
+      // Rista can reassign a brand_id to a different merchant (e.g. a
+      // rebrand/closure); when that happens, our stale row still holds the
+      // old mapping and collides with ristaBrandId's unique constraint.
+      // Redash is the source of truth here, so clear the old holder and
+      // retry once rather than dropping the new owner's sync entirely.
+      const isRistaBrandIdConflict =
+        row.brand_id &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002" &&
+        (error.meta?.target as string[] | undefined)?.includes("ristaBrandId");
+
+      if (isRistaBrandIdConflict) {
+        try {
+          await prisma.merchant.updateMany({
+            where: { ristaBrandId: row.brand_id, dotpeMid: { not: dotpeMid } },
+            data: { ristaBrandId: null },
+          });
+          await prisma.merchant.upsert({ where: { dotpeMid }, ...upsertData });
+          count++;
+          continue;
+        } catch (retryError) {
+          console.error(
+            `syncCrmAdoption: retry after clearing stale ristaBrandId still failed for ${dotpeMid} (${row.merchant_name})`,
+            retryError
+          );
+          continue;
+        }
+      }
+
       console.error(`syncCrmAdoption: skipped merchant ${dotpeMid} (${row.merchant_name})`, error);
     }
   }
@@ -117,45 +147,65 @@ export async function syncCreditPrePost() {
 
 const CREDIT_BREAKUP_MAX_WEEKS = 13; // ~90 days — covers the dashboard's longest date-range preset
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Runs `fn` over `items` with at most `limit` in flight at once. */
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 /**
  * Step 3: per-merchant weekly credit consumption, split by campaign/
- * automation/loyalty. Query 11147 only returns a CUMULATIVE total for
- * "the trailing weekCount weeks" (no per-week breakdown in the response
- * itself), so this calls it once per weekCount from 1..MAX and diffs
- * consecutive cumulative totals to recover each week's own marginal
- * contribution — the same per-merchant/per-week MerchantSnapshot shape the
- * WoW trend chart already reads, now with a real category breakdown too.
+ * automation/loyalty. Query 11147 used to take a "trailing weekCount weeks"
+ * cumulative param (requiring a diff between consecutive calls to recover
+ * each week's own total), but was changed upstream in Redash to an explicit
+ * date_range param — each call now returns that window's own total
+ * directly, so this just calls it once per 7-day window from 1..MAX weeks
+ * back with no diffing needed. Same per-merchant/per-week MerchantSnapshot
+ * shape the WoW trend chart already reads.
  *
- * Also derives creditConsumedL30 from weekCount=4 (~28 days) — a direct
- * cumulative read from Redash, not a delta, and a closer "last 30 days"
- * proxy than the old monthly-boundary approximation.
+ * Unlike the old weekCount param, a date_range window is different on every
+ * call (and every day), so Redash can never serve these from a warm cache —
+ * each of the 13 calls is a genuinely fresh query execution. Run sequentially
+ * that pushed the whole sync past Vercel's 300s cron limit (measured ~8min
+ * in production), so these are fetched with bounded concurrency instead.
+ *
+ * Also derives creditConsumedL30 from a direct 28-day window read.
  */
 export async function syncCreditConsumptionByWeek() {
   const merchants = await prisma.merchant.findMany({ select: { id: true, dotpeMid: true } });
   const merchantIdByMid = new Map(merchants.map((m) => [normalizeMid(m.dotpeMid), m.id]));
 
-  const cumulativeByWeek = new Map<number, Map<number, CreditConsumptionBreakupRow>>();
-  for (let w = 1; w <= CREDIT_BREAKUP_MAX_WEEKS; w++) {
-    const rows = await fetchCreditConsumptionBreakup(w);
-    cumulativeByWeek.set(w, new Map(rows.map((r) => [r["Merchant ID"], r])));
-  }
+  const now = Date.now();
+  const weeks = Array.from({ length: CREDIT_BREAKUP_MAX_WEEKS }, (_, i) => i + 1);
+  const weeklyResults = await mapWithConcurrency(weeks, 4, async (w) => {
+    const windowStart = new Date(now - w * 7 * DAY_MS);
+    const windowEnd = new Date(now - (w - 1) * 7 * DAY_MS);
+    const rows = await fetchCreditConsumptionBreakup(windowStart, windowEnd);
+    return { w, capturedAt: windowStart, rows };
+  });
 
   let written = 0;
-  for (let w = 1; w <= CREDIT_BREAKUP_MAX_WEEKS; w++) {
-    const current = cumulativeByWeek.get(w)!;
-    const previous = w > 1 ? cumulativeByWeek.get(w - 1)! : null;
-    const capturedAt = new Date(Date.now() - w * 7 * 24 * 60 * 60 * 1000);
-
-    for (const [merchantIdNum, row] of current) {
+  for (const { w, capturedAt, rows } of weeklyResults) {
+    for (const row of rows) {
+      const merchantIdNum = row["Merchant ID"];
       const merchantId = merchantIdByMid.get(normalizeMid(String(merchantIdNum)));
       if (!merchantId) continue;
 
-      const prevRow = previous?.get(merchantIdNum);
       const fields: Record<string, number> = {
-        "creditConsumption.total": (row["CRM Total (₹)"] ?? 0) - (prevRow?.["CRM Total (₹)"] ?? 0),
-        "creditConsumption.campaigns": (row["Campaign (₹)"] ?? 0) - (prevRow?.["Campaign (₹)"] ?? 0),
-        "creditConsumption.automations": (row["Automation (₹)"] ?? 0) - (prevRow?.["Automation (₹)"] ?? 0),
-        "creditConsumption.loyalty": (row["Loyalty (₹)"] ?? 0) - (prevRow?.["Loyalty (₹)"] ?? 0),
+        "creditConsumption.total": row["CRM Total (₹)"] ?? 0,
+        "creditConsumption.campaigns": row["Campaign (₹)"] ?? 0,
+        "creditConsumption.automations": row["Automation (₹)"] ?? 0,
+        "creditConsumption.loyalty": row["Loyalty (₹)"] ?? 0,
       };
 
       for (const [fieldName, value] of Object.entries(fields)) {
@@ -173,19 +223,18 @@ export async function syncCreditConsumptionByWeek() {
     }
   }
 
-  const last4Weeks = cumulativeByWeek.get(4);
-  if (last4Weeks) {
-    for (const [merchantIdNum, row] of last4Weeks) {
-      const merchantId = merchantIdByMid.get(normalizeMid(String(merchantIdNum)));
-      if (!merchantId) continue;
-      try {
-        await prisma.merchant.update({
-          where: { id: merchantId },
-          data: { creditConsumedL30: row["CRM Total (₹)"] ?? 0 },
-        });
-      } catch (error) {
-        console.error(`syncCreditConsumptionByWeek: failed to set creditConsumedL30 for ${merchantIdNum}`, error);
-      }
+  const last30Rows = await fetchCreditConsumptionBreakup(new Date(now - 28 * DAY_MS), new Date(now));
+  for (const row of last30Rows) {
+    const merchantIdNum = row["Merchant ID"];
+    const merchantId = merchantIdByMid.get(normalizeMid(String(merchantIdNum)));
+    if (!merchantId) continue;
+    try {
+      await prisma.merchant.update({
+        where: { id: merchantId },
+        data: { creditConsumedL30: row["CRM Total (₹)"] ?? 0 },
+      });
+    } catch (error) {
+      console.error(`syncCreditConsumptionByWeek: failed to set creditConsumedL30 for ${merchantIdNum}`, error);
     }
   }
 

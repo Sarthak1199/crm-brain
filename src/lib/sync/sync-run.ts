@@ -40,22 +40,56 @@ export async function runStep<T>(label: string, fn: () => Promise<T>): Promise<T
   }
 }
 
-export async function getLastSyncTimes() {
-  const [redash, gsheets] = await Promise.all([
-    prisma.syncRun.findFirst({
-      where: { source: "REDASH", success: true },
-      orderBy: { finishedAt: "desc" },
-      select: { finishedAt: true },
-    }),
-    prisma.syncRun.findFirst({
-      where: { source: "GSHEETS", success: true },
-      orderBy: { finishedAt: "desc" },
-      select: { finishedAt: true },
-    }),
-  ]);
+function isStepError(value: unknown): value is { error: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "error" in value &&
+    typeof (value as { error: unknown }).error === "string"
+  );
+}
 
-  return {
-    redash: redash?.finishedAt ?? null,
-    gsheets: gsheets?.finishedAt ?? null,
-  };
+/**
+ * `withSyncRun` records success:true whenever the aggregate function
+ * doesn't throw — but each step inside is isolated by `runStep`, which
+ * swallows its own errors into a `{error}` object instead of throwing. So a
+ * run can be "successful" at the SyncRun level while every individual step
+ * silently failed. This reads the most recent run per source (regardless of
+ * its `success` flag) and inspects its `summary` for any step-level errors,
+ * so the status bar can distinguish "ran clean" from "ran but degraded".
+ */
+export async function getLastSyncStatus() {
+  const sources: SyncSource[] = ["REDASH", "GSHEETS"];
+  const runs = await Promise.all(
+    sources.map((source) =>
+      prisma.syncRun.findFirst({
+        where: { source },
+        orderBy: { startedAt: "desc" },
+        select: { finishedAt: true, success: true, summary: true, error: true },
+      })
+    )
+  );
+
+  return Object.fromEntries(
+    sources.map((source, i) => {
+      const run = runs[i];
+      if (!run) return [source, { finishedAt: null, ok: false, failedSteps: [] as string[] }];
+
+      const failedSteps =
+        run.summary && typeof run.summary === "object"
+          ? Object.entries(run.summary as Record<string, unknown>)
+              .filter(([, v]) => isStepError(v))
+              .map(([step]) => step)
+          : [];
+
+      return [
+        source,
+        {
+          finishedAt: run.finishedAt,
+          ok: run.success && failedSteps.length === 0,
+          failedSteps,
+        },
+      ];
+    })
+  ) as Record<SyncSource, { finishedAt: Date | null; ok: boolean; failedSteps: string[] }>;
 }

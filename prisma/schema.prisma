@@ -149,6 +149,7 @@ model Merchant {
   snapshots          MerchantSnapshot[]
   supportRequests    SupportRequest[]
   onboardingRequests OnboardingRequest[]
+  templateApprovals  TemplateApproval[]
 
   @@index([brandName])
   @@index([crmStatus])
@@ -285,4 +286,58 @@ model OnboardingRequest {
   @@index([merchantId])
   @@index([loyaltyEnabled])
   @@index([crmEnabled])
+}
+
+enum TemplateChannel {
+  SMS
+  WhatsApp
+}
+
+enum TemplateDealType {
+  WithDeal
+  WithoutDeal
+}
+
+enum TemplateCategory {
+  Loyalty
+  Automation
+  Campaign
+  OTP
+  Utility
+}
+
+// category is nullable because the initial import (from the "automation_templates.csv"
+// and "Loyalty and others" sheet tabs) has no reliable category data — ops
+// tags these by hand after import. New templates added through the app's
+// Add Template form always set one (the dropdown has no blank option).
+model Template {
+  id          String            @id @default(cuid())
+  channel     TemplateChannel
+  dealType    TemplateDealType
+  messageText String
+  category    TemplateCategory?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  approvals TemplateApproval[]
+
+  @@index([channel])
+  @@index([category])
+}
+
+// One row per (template, merchant) pair: the same abstract template can be
+// approved for multiple merchants, each with its own provider (WhatsApp
+// Business/Meta) template ID — that ID is not shared across merchants even
+// when the underlying message text is identical.
+model TemplateApproval {
+  id                 String   @id @default(cuid())
+  templateId         String
+  template           Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  merchantId         String
+  merchant           Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  providerTemplateId String
+  createdAt          DateTime @default(now())
+
+  @@unique([templateId, merchantId])
+  @@index([merchantId])
 }
