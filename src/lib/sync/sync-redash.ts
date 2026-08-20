@@ -393,6 +393,35 @@ export async function syncPortfolioTrend() {
   return written;
 }
 
+// Everything except creditConsumptionByWeek — that step alone has measured
+// ~220s even fully parallelized (Redash's own per-query execution time, not
+// something client-side concurrency can shrink further), while these other
+// six steps combined take well under a minute. Splitting it into its own
+// cron (syncRedashCreditWeekly, below) means the daily light-steps run
+// finishes comfortably inside Vercel's real enforced timeout — which held
+// firm at roughly 300s regardless of this route's own `maxDuration` setting,
+// so the fix has to be "do less work per request," not "ask for more time."
+export async function syncRedashLight() {
+  return withSyncRun("REDASH", async () => ({
+    crmAdoption: await runStep("crmAdoption", syncCrmAdoption),
+    creditPrePost: await runStep("creditPrePost", syncCreditPrePost),
+    loyaltyFunnel: await runStep("loyaltyFunnel", syncLoyaltyFunnel),
+    loyaltyMessages: await runStep("loyaltyMessages", syncLoyaltyMessages),
+    automations: await runStep("automations", syncAutomations),
+    portfolioTrend: await runStep("portfolioTrend", syncPortfolioTrend),
+  }));
+}
+
+// Runs only the slow step, in its own SyncRun / cron invocation with a full
+// budget to itself instead of competing with the six lighter steps above.
+export async function syncRedashCreditWeekly() {
+  return withSyncRun("REDASH", async () => ({
+    creditConsumptionByWeek: await runStep("creditConsumptionByWeek", syncCreditConsumptionByWeek),
+  }));
+}
+
+// Full manual sync (the "Sync now" button) — keeps all seven steps in one
+// call since it's user-triggered and retriable, unlike the daily cron.
 export async function syncRedash() {
   return withSyncRun("REDASH", async () => ({
     crmAdoption: await runStep("crmAdoption", syncCrmAdoption),

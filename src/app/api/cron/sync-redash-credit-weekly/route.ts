@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isRedashConfigured } from "@/lib/redash";
-import { syncRedashLight } from "@/lib/sync/sync-redash";
+import { syncRedashCreditWeekly } from "@/lib/sync/sync-redash";
 
-// Confirmed empirically against production: Vercel enforces roughly a 300s
-// gateway timeout on this route regardless of the `maxDuration` value here
-// (tested 300 and 800, both 504'd around the same wall-clock point) — this
-// account's plan doesn't honor the longer Fluid Compute ceiling, so asking
-// for more time isn't the fix. The six steps here (everything except
-// creditConsumptionByWeek, which has its own dedicated cron below and takes
-// ~220s on its own) run in well under a minute.
-export const maxDuration = 120;
+// Split out from /api/cron/sync-redash so this one slow step (measured
+// ~220s even fully parallelized — Redash's own per-query execution time,
+// not something client-side concurrency can shrink further) gets a full
+// budget to itself instead of competing with the six lighter steps for the
+// same ~300s Vercel gateway timeout (confirmed empirically: raising
+// `maxDuration` past ~300 didn't change the actual enforced cutoff on this
+// plan, so "do less work per request" is the only real fix).
+export const maxDuration = 300;
 
 function isAuthorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const results = await syncRedashLight();
+    const results = await syncRedashCreditWeekly();
     return NextResponse.json({ ok: true, results });
   } catch (error) {
     return NextResponse.json(
