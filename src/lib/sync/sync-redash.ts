@@ -175,11 +175,16 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
  *
  * Unlike the old weekCount param, a date_range window is different on every
  * call (and every day), so Redash can never serve these from a warm cache —
- * each of the 13 calls is a genuinely fresh query execution. Run sequentially
- * that pushed the whole sync past Vercel's 300s cron limit (measured ~8min
- * in production), so these are fetched with bounded concurrency instead.
+ * each call is a genuinely fresh query execution, measured at ~60s apiece
+ * server-side on Redash's end. All 14 windows (13 weekly + the L30 rollup
+ * below) are fetched in one fully-parallel batch rather than sequentially or
+ * in small batches — Redash handled a 13-way concurrent burst with no
+ * errors in testing, and going fully parallel bounds the whole step's
+ * wall-clock cost to roughly one query's execution time instead of stacking
+ * them, which is what pushed the full sync past Vercel's timeout budget.
  *
- * Also derives creditConsumedL30 from a direct 28-day window read.
+ * Also derives creditConsumedL30 from a direct 28-day window read, folded
+ * into the same parallel batch instead of a separate trailing call.
  */
 export async function syncCreditConsumptionByWeek() {
   const merchants = await prisma.merchant.findMany({ select: { id: true, dotpeMid: true } });
@@ -187,15 +192,37 @@ export async function syncCreditConsumptionByWeek() {
 
   const now = Date.now();
   const weeks = Array.from({ length: CREDIT_BREAKUP_MAX_WEEKS }, (_, i) => i + 1);
-  const weeklyResults = await mapWithConcurrency(weeks, 4, async (w) => {
-    const windowStart = new Date(now - w * 7 * DAY_MS);
-    const windowEnd = new Date(now - (w - 1) * 7 * DAY_MS);
-    const rows = await fetchCreditConsumptionBreakup(windowStart, windowEnd);
-    return { w, capturedAt: windowStart, rows };
+  type Request = { kind: "week"; w: number } | { kind: "l30" };
+  const requests: Request[] = [...weeks.map((w): Request => ({ kind: "week", w })), { kind: "l30" }];
+
+  const fetched = await mapWithConcurrency(requests, requests.length, async (req) => {
+    const [start, end] =
+      req.kind === "week"
+        ? [new Date(now - req.w * 7 * DAY_MS), new Date(now - (req.w - 1) * 7 * DAY_MS)]
+        : [new Date(now - 28 * DAY_MS), new Date(now)];
+    const rows = await fetchCreditConsumptionBreakup(start, end);
+    return { req, capturedAt: start, rows };
   });
 
   let written = 0;
-  for (const { w, capturedAt, rows } of weeklyResults) {
+  for (const { req, capturedAt, rows } of fetched) {
+    if (req.kind === "l30") {
+      for (const row of rows) {
+        const merchantIdNum = row["Merchant ID"];
+        const merchantId = merchantIdByMid.get(normalizeMid(String(merchantIdNum)));
+        if (!merchantId) continue;
+        try {
+          await prisma.merchant.update({
+            where: { id: merchantId },
+            data: { creditConsumedL30: row["CRM Total (₹)"] ?? 0 },
+          });
+        } catch (error) {
+          console.error(`syncCreditConsumptionByWeek: failed to set creditConsumedL30 for ${merchantIdNum}`, error);
+        }
+      }
+      continue;
+    }
+
     for (const row of rows) {
       const merchantIdNum = row["Merchant ID"];
       const merchantId = merchantIdByMid.get(normalizeMid(String(merchantIdNum)));
@@ -217,24 +244,9 @@ export async function syncCreditConsumptionByWeek() {
           });
           written++;
         } catch (error) {
-          console.error(`syncCreditConsumptionByWeek: skipped ${merchantIdNum}/${fieldName}/week ${w}`, error);
+          console.error(`syncCreditConsumptionByWeek: skipped ${merchantIdNum}/${fieldName}/week ${req.w}`, error);
         }
       }
-    }
-  }
-
-  const last30Rows = await fetchCreditConsumptionBreakup(new Date(now - 28 * DAY_MS), new Date(now));
-  for (const row of last30Rows) {
-    const merchantIdNum = row["Merchant ID"];
-    const merchantId = merchantIdByMid.get(normalizeMid(String(merchantIdNum)));
-    if (!merchantId) continue;
-    try {
-      await prisma.merchant.update({
-        where: { id: merchantId },
-        data: { creditConsumedL30: row["CRM Total (₹)"] ?? 0 },
-      });
-    } catch (error) {
-      console.error(`syncCreditConsumptionByWeek: failed to set creditConsumedL30 for ${merchantIdNum}`, error);
     }
   }
 
