@@ -12,9 +12,16 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith("/login");
 
+  // Auth.js prefixes the session cookie with "__Secure-" whenever it sets
+  // it over HTTPS (production). getToken() defaults secureCookie to false
+  // and won't look for that prefix unless told to — so in prod it was
+  // always missing the real cookie, always seeing isLoggedIn === false,
+  // and bouncing every authenticated request straight back to /login with
+  // no visible error (a silent redirect loop, not a crash).
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    secureCookie: request.nextUrl.protocol === "https:",
   });
   const isLoggedIn = !!token;
 
