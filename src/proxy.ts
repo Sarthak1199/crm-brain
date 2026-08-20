@@ -1,21 +1,33 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-export const proxy = auth((req) => {
-  const isLoggedIn = !!req.auth;
-  const { pathname } = req.nextUrl;
+// Deliberately not the `auth((req) => {...})` HOC from "@/auth" — that
+// wrapper routes every intercepted request through Auth.js's own action
+// dispatcher, and versions of next-auth v5 beta have a recurring bug where
+// that dispatcher can't parse a plain page path (e.g. "/") as a known
+// action and throws "UnknownAction: Cannot parse action at /". getToken()
+// only decodes the session JWT from cookies — no action dispatch involved.
+export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith("/login");
 
+  const token = await getToken({
+    req: request,
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  });
+  const isLoggedIn = !!token;
+
   if (!isLoggedIn && !isAuthRoute) {
-    const loginUrl = new URL("/login", req.nextUrl);
+    const loginUrl = new URL("/login", request.nextUrl);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
   if (isLoggedIn && isAuthRoute) {
-    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+    return NextResponse.redirect(new URL("/dashboard", request.nextUrl));
   }
-});
+}
 
 export const config = {
   matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
