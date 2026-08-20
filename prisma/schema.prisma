@@ -326,14 +326,18 @@ enum TemplateHandle {
 // tags these by hand after import. New templates added through the app's
 // Add Template form always set one (the dropdown has no blank option).
 model Template {
-  id          String            @id @default(cuid())
-  channel     TemplateChannel
-  dealType    TemplateDealType
-  messageText String
-  category    TemplateCategory?
-  handle      TemplateHandle?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id           String            @id @default(cuid())
+  channel      TemplateChannel
+  dealType     TemplateDealType
+  messageText  String
+  category     TemplateCategory?
+  handle       TemplateHandle?
+  // Free-text MID of the merchant who asked for this template, if any —
+  // distinct from TemplateApproval, which tracks the submission/approval
+  // lifecycle itself rather than who originally requested it.
+  requestedMid String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
   approvals TemplateApproval[]
 

@@ -94,6 +94,10 @@ export function salesStatus(merchants: SerializedMerchant[]) {
 // since the cap only kicks in above `limit`.
 const BAR_CHART_LIMIT = 10;
 const LINE_CHART_LIMIT = 6;
+// Customers Reached asks for at least 15 Mx visible in the bar chart itself
+// (separate from the general BAR_CHART_LIMIT so other charts stay as dense
+// as before).
+const CUSTOMERS_REACHED_CHART_LIMIT = 15;
 
 export function creditsByMid(merchants: SerializedMerchant[], limit = BAR_CHART_LIMIT) {
   return [...merchants]
@@ -140,6 +144,47 @@ export function creditBreakupByMid(
     .sort((a, b) => b.total - a.total)
     .slice(0, limit)
     .map(({ total: _total, ...rest }) => rest);
+}
+
+// Same per-merchant campaign/automation/loyalty breakdown as
+// creditBreakupByMid, but for the "Customers Reached" → View Details table:
+// every merchant (no top-N slice) and carrying id/dotpeMid so the table can
+// link back to the merchant and show MID, not just a chart label.
+export function creditBreakupTable(
+  merchants: SerializedMerchant[],
+  snapshotsByMerchant: Record<string, SerializedSnapshot[]>,
+  dateRange: { from?: string; to?: string } = {}
+) {
+  function sumField(merchantId: string, fieldName: string) {
+    const snaps = snapshotsByMerchant[merchantId] ?? [];
+    return snaps
+      .filter((s) => s.fieldName === fieldName)
+      .filter((s) => {
+        const weekKey = new Date(s.capturedAt).toISOString().slice(0, 10);
+        if (dateRange.from && weekKey < dateRange.from) return false;
+        if (dateRange.to && weekKey > dateRange.to) return false;
+        return true;
+      })
+      .reduce((a, s) => a + s.value, 0);
+  }
+
+  return merchants
+    .map((m) => {
+      const campaigns = sumField(m.id, "creditConsumption.campaigns");
+      const loyalty = sumField(m.id, "creditConsumption.loyalty");
+      const automations = sumField(m.id, "creditConsumption.automations");
+      return {
+        id: m.id,
+        brandName: m.brandName,
+        dotpeMid: m.dotpeMid,
+        totalStores: m.totalStores,
+        campaigns,
+        loyalty,
+        automations,
+        total: campaigns + loyalty + automations,
+      };
+    })
+    .sort((a, b) => b.total - a.total);
 }
 
 export function wowCreditTrend(
@@ -190,7 +235,7 @@ export function adoptionStats(merchants: SerializedMerchant[]) {
       total: m.customerCount + m.automationsTotalSent + m.campaignsContactsReached,
     }))
     .sort((a, b) => b.total - a.total)
-    .slice(0, BAR_CHART_LIMIT)
+    .slice(0, CUSTOMERS_REACHED_CHART_LIMIT)
     .map(({ total: _total, ...rest }) => rest);
 
   return { loyaltySetups, automationSetups, rfmCampaignsSent, totalContactsReached, byChannel };

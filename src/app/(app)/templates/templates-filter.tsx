@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const CHANNEL_OPTIONS = [
   { value: "all", label: "All Channels" },
@@ -26,7 +26,7 @@ const HANDLE_OPTIONS = [
   { value: "DotpeCRM", label: "DotPe CRM" },
 ];
 
-function FilterGroup({
+function FilterDropdown({
   options,
   active,
   onSelect,
@@ -36,23 +36,18 @@ function FilterGroup({
   onSelect: (value: string) => void;
 }) {
   return (
-    <div className="inline-flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-muted/40 p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onSelect(o.value)}
-          className={cn(
-            "rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors",
-            active === o.value
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
+    <Select value={active} onValueChange={onSelect}>
+      <SelectTrigger className="h-9 w-[160px] rounded-lg text-[13px]">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -76,9 +71,9 @@ export function TemplatesFilter() {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <FilterGroup options={CHANNEL_OPTIONS} active={activeChannel} onSelect={(v) => setParam("channel", v)} />
-      <FilterGroup options={CATEGORY_OPTIONS} active={activeCategory} onSelect={(v) => setParam("category", v)} />
-      <FilterGroup options={HANDLE_OPTIONS} active={activeHandle} onSelect={(v) => setParam("handle", v)} />
+      <FilterDropdown options={CHANNEL_OPTIONS} active={activeChannel} onSelect={(v) => setParam("channel", v)} />
+      <FilterDropdown options={CATEGORY_OPTIONS} active={activeCategory} onSelect={(v) => setParam("category", v)} />
+      <FilterDropdown options={HANDLE_OPTIONS} active={activeHandle} onSelect={(v) => setParam("handle", v)} />
     </div>
   );
 }

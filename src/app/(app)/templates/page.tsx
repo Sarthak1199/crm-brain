@@ -52,6 +52,7 @@ export default async function TemplatesPage({
     dealType: t.dealType,
     category: t.category,
     handle: t.handle,
+    requestedMid: t.requestedMid,
     messageText: t.messageText,
     createdAt: t.createdAt.toISOString(),
     approvals: t.approvals,

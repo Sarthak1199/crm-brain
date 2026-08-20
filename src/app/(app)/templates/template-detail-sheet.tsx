@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CopyButton } from "@/components/copy-button";
 import { Section } from "@/components/detail-panel";
 import { formatDate } from "@/lib/format";
 import { deleteTemplate, deleteTemplateApproval } from "./actions";
@@ -111,11 +112,14 @@ export function TemplateDetailSheet({
                     </Button>
                   </div>
                 </div>
-                <SheetDescription>Created {formatDate(row.createdAt)}</SheetDescription>
+                <SheetDescription>
+                  Created {formatDate(row.createdAt)}
+                  {row.requestedMid ? ` · Requested MID: ${row.requestedMid}` : ""}
+                </SheetDescription>
               </SheetHeader>
 
               <div className="px-4">
-                <Section title="Message">
+                <Section title="Message" action={<CopyButton text={row.messageText} />}>
                   <dd className="col-span-2 whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
                     {row.messageText}
                   </dd>
@@ -186,6 +190,7 @@ export function TemplateDetailSheet({
             dealType: row.dealType,
             messageText: row.messageText,
             category: row.category,
+            requestedMid: row.requestedMid,
             handle: row.handle,
           }}
           onSuccess={() => onOpenChange(false)}

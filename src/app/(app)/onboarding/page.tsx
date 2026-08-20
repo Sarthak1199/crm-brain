@@ -27,7 +27,12 @@ export default async function OnboardingPage() {
   ]);
 
   const requestsRaised = requests.length;
-  const crmLicenseEnabled = requests.filter((r) => r.crmEnabled).length;
+  // CRM Adoption Redash query (10505)'s crm_status field, A = Active —
+  // synced onto Merchant.crmStatus. Not the onboarding sheet's crmEnabled
+  // write-back, which only reflects whether *this specific request* was
+  // actioned, not the merchant's actual current license state.
+  const crmLicenseEnabled = merchants.filter((m) => m.crmStatus === "Active").length;
+  // "Dotpe CRM [Activation] — Loyalty enable" GSheet's write-back column.
   const loyaltyLicenseEnabled = requests.filter((r) => r.loyaltyEnabled).length;
   // wabaStatus is the app's existing "Marketing License" field (see the
   // Merchant License Status table below) — no sync currently writes it, so

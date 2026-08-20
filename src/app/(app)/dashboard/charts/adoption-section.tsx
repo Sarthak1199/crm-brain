@@ -12,6 +12,7 @@ import type { SerializedMerchant } from "@/lib/serialize";
 import { LoyaltyPanel } from "../panels/loyalty-panel";
 import { AutomationPanel } from "../panels/automation-panel";
 import { CampaignPanel } from "../panels/campaign-panel";
+import { CustomersReachedPanel, type CustomersReachedRow } from "../panels/customers-reached-panel";
 
 const AXIS_TICK = { fontSize: 11, fill: CHART_AXIS };
 const legendStyle = { fontSize: 12, paddingTop: 8 };
@@ -134,15 +135,18 @@ export function AdoptionSection({
   merchants,
   loyaltyLicensedCount,
   crmActivatedCount,
+  customersReachedRows,
 }: {
   data: ReturnType<typeof adoptionStats>;
   merchants: AdoptionRow[];
   loyaltyLicensedCount: number;
   crmActivatedCount: number;
+  customersReachedRows: CustomersReachedRow[];
 }) {
   const [loyaltyOpen, setLoyaltyOpen] = useState(false);
   const [automationOpen, setAutomationOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
+  const [customersReachedOpen, setCustomersReachedOpen] = useState(false);
 
   const rfmMerchantCount = merchants.filter((m) => m.campaignsUsingRfm > 0).length;
 
@@ -189,9 +193,19 @@ export function AdoptionSection({
         sources={CHART_SOURCES.customersReached}
         latest
         action={
-          <div className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[12px] text-muted-foreground">
-            <Users className="size-3.5" />
-            {formatNumber(data.totalContactsReached)} total
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[12px] text-muted-foreground">
+              <Users className="size-3.5" />
+              {formatNumber(data.totalContactsReached)} total
+            </div>
+            <button
+              type="button"
+              onClick={() => setCustomersReachedOpen(true)}
+              className="inline-flex shrink-0 items-center gap-0.5 text-[12px] font-medium text-primary hover:underline"
+            >
+              View details
+              <ArrowUpRight className="size-3" />
+            </button>
           </div>
         }
       >
@@ -214,6 +228,7 @@ export function AdoptionSection({
       <LoyaltyPanel merchants={merchants} open={loyaltyOpen} onOpenChange={setLoyaltyOpen} />
       <AutomationPanel merchants={merchants} open={automationOpen} onOpenChange={setAutomationOpen} />
       <CampaignPanel merchants={merchants} open={campaignOpen} onOpenChange={setCampaignOpen} />
+      <CustomersReachedPanel rows={customersReachedRows} open={customersReachedOpen} onOpenChange={setCustomersReachedOpen} />
     </div>
   );
 }

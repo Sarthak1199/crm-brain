@@ -10,6 +10,7 @@ import {
   activationFunnelByMx,
   adoptionStats,
   creditBreakupByMid,
+  creditBreakupTable,
   creditsByMid,
   productStatusStages,
   requestTypeStats,
@@ -155,6 +156,7 @@ export default async function DashboardPage({
             merchants={mList}
             loyaltyLicensedCount={loyaltyLicensedIds.size}
             crmActivatedCount={crmActivatedIds.size}
+            customersReachedRows={creditBreakupTable(mList, snapshotsByMerchant, { from: params.from, to: params.to })}
           />
         </section>
 

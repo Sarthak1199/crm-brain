@@ -10,6 +10,7 @@ function parseTemplateFields(formData: FormData) {
   const messageText = formData.get("messageText");
   const category = formData.get("category");
   const handle = formData.get("handle");
+  const requestedMid = formData.get("requestedMid");
 
   if (channel !== "SMS" && channel !== "WhatsApp") {
     return { error: "Select a channel." } as const;
@@ -34,6 +35,7 @@ function parseTemplateFields(formData: FormData) {
       messageText: messageText.trim(),
       category: category as TemplateCategory,
       handle: handle as TemplateHandle,
+      requestedMid: typeof requestedMid === "string" && requestedMid.trim() ? requestedMid.trim() : null,
     },
   } as const;
 }

@@ -36,6 +36,7 @@ export function TypedAdoptionPanel<T extends CommonAdoptionRow>({
   rows,
   extraColumns,
   defaultSortKey = "brandName",
+  defaultDirection = "asc",
   open,
   onOpenChange,
 }: {
@@ -44,6 +45,7 @@ export function TypedAdoptionPanel<T extends CommonAdoptionRow>({
   rows: T[];
   extraColumns: ExtraColumn<T>[];
   defaultSortKey?: string;
+  defaultDirection?: "asc" | "desc";
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -66,7 +68,7 @@ export function TypedAdoptionPanel<T extends CommonAdoptionRow>({
 
   const { sorted, sortKey, direction, toggleSort } = useSort(filtered, accessors, {
     key: defaultSortKey,
-    direction: "asc",
+    direction: defaultDirection,
   });
 
   return (

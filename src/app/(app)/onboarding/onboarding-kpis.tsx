@@ -4,7 +4,8 @@ import { useState } from "react";
 import { FileText, KeyRound, Gift, Megaphone, CheckCircle2 } from "lucide-react";
 import { StatCard } from "@/components/stat-card";
 import { formatNumber } from "@/lib/format";
-import { CHART_SOURCES } from "@/lib/sync/source-links";
+import { CHART_SOURCES, REDASH_SOURCE_LINKS } from "@/lib/sync/source-links";
+import { REDASH_QUERY_IDS } from "@/lib/sync/redash-query-ids";
 import { OnboardingRequestsPanel, type OnboardingRequestRow } from "./onboarding-requests-panel";
 
 export function OnboardingKpis({
@@ -37,7 +38,7 @@ export function OnboardingKpis({
         icon={KeyRound}
         label="CRM License Enabled"
         value={formatNumber(crmLicenseEnabled)}
-        sources={CHART_SOURCES.onboarding}
+        sources={[REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.crmAdoption]]}
       />
       <StatCard
         icon={Gift}

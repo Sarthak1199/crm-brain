@@ -27,6 +27,7 @@ export type TemplateRow = {
   dealType: DealType;
   category: Category | null;
   handle: Handle | null;
+  requestedMid: string | null;
   messageText: string;
   createdAt: string;
   approvals: ApprovalRow[];

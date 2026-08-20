@@ -1,9 +1,10 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Save } from "lucide-react";
 import { createTemplate, updateTemplate } from "./actions";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,6 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { TEMPLATE_VARIABLES } from "@/lib/template-variables";
 
 export type Channel = "SMS" | "WhatsApp";
 export type DealType = "WithDeal" | "WithoutDeal";
@@ -34,6 +36,7 @@ export type ExistingTemplate = {
   messageText: string;
   category: Category | null;
   handle: Handle | null;
+  requestedMid: string | null;
 };
 
 export function TemplateForm({
@@ -56,7 +59,9 @@ export function TemplateForm({
   const [dealType, setDealType] = useState<DealType | "">(existing?.dealType ?? "");
   const [category, setCategory] = useState<Category | "">(existing?.category ?? "");
   const [handle, setHandle] = useState<Handle | "">(existing?.handle ?? "");
+  const [requestedMid, setRequestedMid] = useState(existing?.requestedMid ?? "");
   const [messageText, setMessageText] = useState(existing?.messageText ?? "");
+  const messageTextRef = useRef<HTMLTextAreaElement>(null);
 
   const action = isEdit ? updateTemplate.bind(null, existing.id) : createTemplate;
   const [error, formAction, isPending] = useActionState(action, undefined);
@@ -68,6 +73,7 @@ export function TemplateForm({
       setDealType("");
       setCategory("");
       setHandle("");
+      setRequestedMid("");
       setMessageText("");
     }
   }
@@ -85,6 +91,26 @@ export function TemplateForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPending]);
 
+  function insertVariable(variable: string) {
+    const el = messageTextRef.current;
+    if (!el) {
+      setMessageText((t) => t + variable);
+      return;
+    }
+    const start = el.selectionStart ?? messageText.length;
+    const end = el.selectionEnd ?? messageText.length;
+    const next = messageText.slice(0, start) + variable + messageText.slice(end);
+    setMessageText(next);
+    // Restore focus and place the cursor right after the inserted text —
+    // without this the textarea loses selection state on the next render
+    // and the cursor jumps to the end, making repeated inserts awkward.
+    requestAnimationFrame(() => {
+      el.focus();
+      const cursor = start + variable.length;
+      el.setSelectionRange(cursor, cursor);
+    });
+  }
+
   const form = (
     <DialogContent className="max-w-lg">
       <DialogHeader>
@@ -96,7 +122,7 @@ export function TemplateForm({
         </DialogDescription>
       </DialogHeader>
 
-      <form action={formAction} className="flex flex-col gap-4">
+      <form action={formAction} className="flex max-h-[75vh] flex-col gap-4 overflow-y-auto">
         <input type="hidden" name="channel" value={channel} />
         <input type="hidden" name="dealType" value={dealType} />
         <input type="hidden" name="category" value={category} />
@@ -160,10 +186,41 @@ export function TemplateForm({
         </div>
 
         <div className="flex flex-col gap-1.5">
+          <Label htmlFor="requestedMid" className="text-[13px] font-medium text-foreground">
+            Requested MID
+          </Label>
+          <Input
+            id="requestedMid"
+            name="requestedMid"
+            value={requestedMid}
+            onChange={(e) => setRequestedMid(e.target.value)}
+            placeholder="Optional — MID of the merchant who requested this"
+            className="h-9 rounded-lg text-[13px]"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-[13px] font-medium text-foreground">Insert variable</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {TEMPLATE_VARIABLES.map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => insertVariable(v)}
+                className="rounded-full border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
           <Label htmlFor="messageText" className="text-[13px] font-medium text-foreground">
             Message Text
           </Label>
           <Textarea
+            ref={messageTextRef}
             id="messageText"
             name="messageText"
             value={messageText}
@@ -189,12 +246,13 @@ export function TemplateForm({
           {isPending ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              {isEdit ? "Saving..." : "Creating..."}
+              Saving...
             </>
-          ) : isEdit ? (
-            "Save changes"
           ) : (
-            "Create template"
+            <>
+              <Save className="size-4" />
+              Save
+            </>
           )}
         </Button>
       </form>

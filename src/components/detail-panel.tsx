@@ -1,7 +1,18 @@
-export function Section({ title, children }: { title: string; children: React.ReactNode }) {
+export function Section({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div className="border-b border-border py-5 first:pt-0 last:border-b-0">
-      <h3 className="mb-3 text-[13px] font-semibold text-foreground">{title}</h3>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="text-[13px] font-semibold text-foreground">{title}</h3>
+        {action}
+      </div>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3">{children}</dl>
     </div>
   );
