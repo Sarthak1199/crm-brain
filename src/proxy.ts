@@ -36,6 +36,16 @@ export async function proxy(request: NextRequest) {
   }
 }
 
+// api/cron/* authenticates via a Bearer CRON_SECRET header, not a session
+// cookie — Vercel's actual cron invocations carry no cookie at all, so
+// without this exclusion every cron hit was silently 307-redirected to
+// /login by the block above before it ever reached the route's own
+// isAuthorized() check. The daily 9AM sync never actually ran because of
+// this, regardless of anything in the sync logic itself. api/admin/sync is
+// excluded too — it does its own session + role check inside the handler
+// (see src/app/api/admin/sync/route.ts), so gating it here a second time is
+// redundant and, for a plain fetch/curl caller with no cookie, would have
+// the same silent-redirect problem.
 export const config = {
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/auth|api/cron|api/admin|_next/static|_next/image|favicon.ico).*)"],
 };
