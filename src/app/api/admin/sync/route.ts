@@ -5,10 +5,16 @@ import { isGsheetsConfigured } from "@/lib/gsheets";
 import { syncRedash } from "@/lib/sync/sync-redash";
 import { syncGsheets } from "@/lib/sync/sync-gsheets";
 
-// Runs both syncs sequentially — the Redash side alone has taken 5-6+
-// minutes in practice. Requires a Vercel plan that supports long function
-// durations (Hobby hard-caps at 60s regardless of this setting).
-export const maxDuration = 300;
+// Runs both syncs concurrently, not sequentially — they share this one
+// request's budget (Redash alone has measured 5:25-6:54 against
+// production), so stacking them back-to-back risks a platform timeout that
+// kills the function mid-write, leaving a SyncRun row stuck with no
+// finishedAt (see getLastSyncStatus's stuckAttempt handling). Running them
+// concurrently means the wall-clock cost is whichever one is slower, not
+// both added together. 800s is Vercel's ceiling on plans with Fluid Compute
+// enabled (Pro+) — see the matching comment on /api/cron/sync-redash for
+// why Redash alone needs this much headroom.
+export const maxDuration = 800;
 
 export async function POST() {
   const session = await auth();
@@ -19,25 +25,20 @@ export async function POST() {
   const results: Record<string, unknown> = {};
   const errors: Record<string, string> = {};
 
-  if (isRedashConfigured()) {
-    try {
-      results.redash = await syncRedash();
-    } catch (error) {
-      errors.redash = error instanceof Error ? error.message : "Unknown error";
-    }
-  } else {
-    errors.redash = "Not configured (REDASH_BASE_URL / REDASH_API_KEY)";
-  }
+  const [redash, gsheets] = await Promise.allSettled([
+    isRedashConfigured()
+      ? syncRedash()
+      : Promise.reject(new Error("Not configured (REDASH_BASE_URL / REDASH_API_KEY)")),
+    isGsheetsConfigured()
+      ? syncGsheets()
+      : Promise.reject(new Error("Not configured (GOOGLE_SERVICE_ACCOUNT_EMAIL / GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY)")),
+  ]);
 
-  if (isGsheetsConfigured()) {
-    try {
-      results.gsheets = await syncGsheets();
-    } catch (error) {
-      errors.gsheets = error instanceof Error ? error.message : "Unknown error";
-    }
-  } else {
-    errors.gsheets = "Not configured (GOOGLE_SERVICE_ACCOUNT_EMAIL / GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY)";
-  }
+  if (redash.status === "fulfilled") results.redash = redash.value;
+  else errors.redash = redash.reason instanceof Error ? redash.reason.message : "Unknown error";
+
+  if (gsheets.status === "fulfilled") results.gsheets = gsheets.value;
+  else errors.gsheets = gsheets.reason instanceof Error ? gsheets.reason.message : "Unknown error";
 
   return NextResponse.json({ ok: Object.keys(errors).length === 0, results, errors });
 }

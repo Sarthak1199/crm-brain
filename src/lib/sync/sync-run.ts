@@ -49,47 +49,68 @@ function isStepError(value: unknown): value is { error: string } {
   );
 }
 
+// Generous over the 300s Vercel maxDuration on the cron/admin sync routes —
+// a run still unfinished well past this has almost certainly been killed by
+// a platform timeout (e.g. the combined redash+gsheets admin sync exceeding
+// its shared budget) rather than genuinely still in progress.
+const STUCK_THRESHOLD_MS = 10 * 60 * 1000;
+
 /**
  * `withSyncRun` records success:true whenever the aggregate function
  * doesn't throw — but each step inside is isolated by `runStep`, which
  * swallows its own errors into a `{error}` object instead of throwing. So a
  * run can be "successful" at the SyncRun level while every individual step
- * silently failed. This reads the most recent run per source (regardless of
- * its `success` flag) and inspects its `summary` for any step-level errors,
- * so the status bar can distinguish "ran clean" from "ran but degraded".
+ * silently failed. This inspects the most recent *completed* run's summary
+ * for step-level errors, so the status bar can distinguish "ran clean" from
+ * "ran but degraded" — deliberately not the most recent run overall,
+ * because a run killed mid-flight by a platform timeout never gets a
+ * finishedAt, and treating that as "the" status would regress a real,
+ * recently-successful sync to looking like it never ran. A crashed/stuck
+ * newer attempt is instead surfaced separately via `stuckAttempt`.
  */
 export async function getLastSyncStatus() {
   const sources: SyncSource[] = ["REDASH", "GSHEETS"];
-  const runs = await Promise.all(
-    sources.map((source) =>
-      prisma.syncRun.findFirst({
-        where: { source },
-        orderBy: { startedAt: "desc" },
-        select: { finishedAt: true, success: true, summary: true, error: true },
-      })
-    )
-  );
-
-  return Object.fromEntries(
-    sources.map((source, i) => {
-      const run = runs[i];
-      if (!run) return [source, { finishedAt: null, ok: false, failedSteps: [] as string[] }];
+  const results = await Promise.all(
+    sources.map(async (source) => {
+      const [lastFinished, latestAttempt] = await Promise.all([
+        prisma.syncRun.findFirst({
+          where: { source, finishedAt: { not: null } },
+          orderBy: { finishedAt: "desc" },
+          select: { finishedAt: true, success: true, summary: true },
+        }),
+        prisma.syncRun.findFirst({
+          where: { source },
+          orderBy: { startedAt: "desc" },
+          select: { startedAt: true, finishedAt: true },
+        }),
+      ]);
 
       const failedSteps =
-        run.summary && typeof run.summary === "object"
-          ? Object.entries(run.summary as Record<string, unknown>)
+        lastFinished?.summary && typeof lastFinished.summary === "object"
+          ? Object.entries(lastFinished.summary as Record<string, unknown>)
               .filter(([, v]) => isStepError(v))
               .map(([step]) => step)
           : [];
 
+      const stuckAttempt =
+        !!latestAttempt &&
+        !latestAttempt.finishedAt &&
+        Date.now() - latestAttempt.startedAt.getTime() > STUCK_THRESHOLD_MS;
+
       return [
         source,
         {
-          finishedAt: run.finishedAt,
-          ok: run.success && failedSteps.length === 0,
+          finishedAt: lastFinished?.finishedAt ?? null,
+          ok: !!lastFinished?.success && failedSteps.length === 0,
           failedSteps,
+          stuckAttempt,
         },
-      ];
+      ] as const;
     })
-  ) as Record<SyncSource, { finishedAt: Date | null; ok: boolean; failedSteps: string[] }>;
+  );
+
+  return Object.fromEntries(results) as Record<
+    SyncSource,
+    { finishedAt: Date | null; ok: boolean; failedSteps: string[]; stuckAttempt: boolean }
+  >;
 }

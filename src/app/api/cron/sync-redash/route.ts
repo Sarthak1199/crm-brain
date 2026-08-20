@@ -3,10 +3,17 @@ import { isRedashConfigured } from "@/lib/redash";
 import { syncRedash } from "@/lib/sync/sync-redash";
 
 // The full Redash sync (crmAdoption + the 13-call credit-consumption-by-week
-// loop + everything else) has run 5-6+ minutes in practice — well past
-// Vercel's default function timeout. Requires a plan that supports this
-// (Pro or higher); Hobby hard-caps at 60s regardless of this setting.
-export const maxDuration = 300;
+// loop + everything else) has measured 5:25-6:54 against production, with
+// creditConsumptionByWeek's per-window Redash queries alone taking ~220s
+// even at 4x concurrency (each fresh query execution is ~60s server-side on
+// Redash's end, not something client-side concurrency alone can fix) — too
+// close to a 300s budget to be reliable. 800s is Vercel's ceiling on plans
+// with Fluid Compute enabled (Pro+); Hobby hard-caps at 60s regardless of
+// this setting, and a Pro plan without Fluid Compute caps at 300s regardless
+// — if that's the case here, this value is silently clamped back down and
+// the underlying slow-query problem still needs a structural fix (e.g.
+// splitting creditConsumptionByWeek into its own cron).
+export const maxDuration = 800;
 
 function isAuthorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
