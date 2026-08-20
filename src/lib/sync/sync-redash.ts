@@ -2,21 +2,17 @@ import { prisma } from "@/lib/prisma";
 import {
   fetchAutomationPerformance,
   fetchCrmAdoption,
-  fetchCrmCreditMonthly,
+  fetchCreditConsumptionBreakup,
   fetchCrmCreditPrePost,
   fetchCrmWeeklyTrend,
   fetchLoyaltyFunnel,
   fetchLoyaltyMessages,
+  type CreditConsumptionBreakupRow,
 } from "./redash-queries";
 import { normalizeMid } from "./mid";
 import { withSyncRun, runStep } from "./sync-run";
 
 type CreditBreakup = { total?: number; campaigns?: number; loyalty?: number; automations?: number };
-
-function monthStart(month: string) {
-  // "2026-07" -> 2026-07-01
-  return new Date(`${month}-01T00:00:00Z`);
-}
 
 async function mergeCreditBreakup(merchantId: string, patch: Partial<CreditBreakup>) {
   const merchant = await prisma.merchant.findUnique({
@@ -119,75 +115,76 @@ export async function syncCreditPrePost() {
   return matched;
 }
 
+const CREDIT_BREAKUP_MAX_WEEKS = 13; // ~90 days — covers the dashboard's longest date-range preset
+
 /**
- * Step 3: per-merchant credit consumption history for the trend sparkline.
- * NOTE: this Redash query buckets by *month*, not week — there is no
- * per-merchant weekly credit query today, so MerchantSnapshot rows are
- * written at monthly cadence (closest real granularity available).
+ * Step 3: per-merchant weekly credit consumption, split by campaign/
+ * automation/loyalty. Query 11147 only returns a CUMULATIVE total for
+ * "the trailing weekCount weeks" (no per-week breakdown in the response
+ * itself), so this calls it once per weekCount from 1..MAX and diffs
+ * consecutive cumulative totals to recover each week's own marginal
+ * contribution — the same per-merchant/per-week MerchantSnapshot shape the
+ * WoW trend chart already reads, now with a real category breakdown too.
  *
- * Also derives creditConsumedL30: the most recent month's "Consumed (₹)" as
- * the closest available proxy for "last 30 days" (no daily/weekly-granular
- * credit query exists to compute a true rolling 30-day figure).
+ * Also derives creditConsumedL30 from weekCount=4 (~28 days) — a direct
+ * cumulative read from Redash, not a delta, and a closer "last 30 days"
+ * proxy than the old monthly-boundary approximation.
  */
-export async function syncCreditMonthlySnapshots() {
+export async function syncCreditConsumptionByWeek() {
   const merchants = await prisma.merchant.findMany({ select: { id: true, dotpeMid: true } });
+  const merchantIdByMid = new Map(merchants.map((m) => [normalizeMid(m.dotpeMid), m.id]));
+
+  const cumulativeByWeek = new Map<number, Map<number, CreditConsumptionBreakupRow>>();
+  for (let w = 1; w <= CREDIT_BREAKUP_MAX_WEEKS; w++) {
+    const rows = await fetchCreditConsumptionBreakup(w);
+    cumulativeByWeek.set(w, new Map(rows.map((r) => [r["Merchant ID"], r])));
+  }
+
   let written = 0;
+  for (let w = 1; w <= CREDIT_BREAKUP_MAX_WEEKS; w++) {
+    const current = cumulativeByWeek.get(w)!;
+    const previous = w > 1 ? cumulativeByWeek.get(w - 1)! : null;
+    const capturedAt = new Date(Date.now() - w * 7 * 24 * 60 * 60 * 1000);
 
-  for (const m of merchants) {
-    const merchantId = Number(m.dotpeMid);
-    if (!Number.isFinite(merchantId)) continue;
+    for (const [merchantIdNum, row] of current) {
+      const merchantId = merchantIdByMid.get(normalizeMid(String(merchantIdNum)));
+      if (!merchantId) continue;
 
-    let rows;
-    try {
-      rows = await fetchCrmCreditMonthly(merchantId);
-    } catch (error) {
-      console.error(`syncCreditMonthlySnapshots: skipped merchant ${merchantId}`, error);
-      continue;
-    }
+      const prevRow = previous?.get(merchantIdNum);
+      const fields: Record<string, number> = {
+        "creditConsumption.total": (row["CRM Total (₹)"] ?? 0) - (prevRow?.["CRM Total (₹)"] ?? 0),
+        "creditConsumption.campaigns": (row["Campaign (₹)"] ?? 0) - (prevRow?.["Campaign (₹)"] ?? 0),
+        "creditConsumption.automations": (row["Automation (₹)"] ?? 0) - (prevRow?.["Automation (₹)"] ?? 0),
+        "creditConsumption.loyalty": (row["Loyalty (₹)"] ?? 0) - (prevRow?.["Loyalty (₹)"] ?? 0),
+      };
 
-    let latestMonth: string | null = null;
-    let latestConsumed = 0;
-
-    for (const row of rows) {
-      const capturedAt = monthStart(row.Month);
-      try {
-        await prisma.merchantSnapshot.upsert({
-          where: {
-            merchantId_fieldName_capturedAt: {
-              merchantId: m.id,
-              fieldName: "creditConsumption.total",
-              capturedAt,
-            },
-          },
-          create: {
-            merchantId: m.id,
-            fieldName: "creditConsumption.total",
-            value: row["Consumed (₹)"] ?? 0,
-            capturedAt,
-          },
-          update: {
-            value: row["Consumed (₹)"] ?? 0,
-          },
-        });
-        written++;
-
-        if (!latestMonth || row.Month > latestMonth) {
-          latestMonth = row.Month;
-          latestConsumed = row["Consumed (₹)"] ?? 0;
+      for (const [fieldName, value] of Object.entries(fields)) {
+        try {
+          await prisma.merchantSnapshot.upsert({
+            where: { merchantId_fieldName_capturedAt: { merchantId, fieldName, capturedAt } },
+            create: { merchantId, fieldName, value, capturedAt },
+            update: { value },
+          });
+          written++;
+        } catch (error) {
+          console.error(`syncCreditConsumptionByWeek: skipped ${merchantIdNum}/${fieldName}/week ${w}`, error);
         }
-      } catch (error) {
-        console.error(`syncCreditMonthlySnapshots: skipped ${merchantId}/${row.Month}`, error);
       }
     }
+  }
 
-    if (latestMonth) {
+  const last4Weeks = cumulativeByWeek.get(4);
+  if (last4Weeks) {
+    for (const [merchantIdNum, row] of last4Weeks) {
+      const merchantId = merchantIdByMid.get(normalizeMid(String(merchantIdNum)));
+      if (!merchantId) continue;
       try {
         await prisma.merchant.update({
-          where: { id: m.id },
-          data: { creditConsumedL30: latestConsumed },
+          where: { id: merchantId },
+          data: { creditConsumedL30: row["CRM Total (₹)"] ?? 0 },
         });
       } catch (error) {
-        console.error(`syncCreditMonthlySnapshots: failed to set creditConsumedL30 for ${merchantId}`, error);
+        console.error(`syncCreditConsumptionByWeek: failed to set creditConsumedL30 for ${merchantIdNum}`, error);
       }
     }
   }
@@ -339,7 +336,7 @@ export async function syncRedash() {
   return withSyncRun("REDASH", async () => ({
     crmAdoption: await runStep("crmAdoption", syncCrmAdoption),
     creditPrePost: await runStep("creditPrePost", syncCreditPrePost),
-    creditMonthlySnapshots: await runStep("creditMonthlySnapshots", syncCreditMonthlySnapshots),
+    creditConsumptionByWeek: await runStep("creditConsumptionByWeek", syncCreditConsumptionByWeek),
     loyaltyFunnel: await runStep("loyaltyFunnel", syncLoyaltyFunnel),
     loyaltyMessages: await runStep("loyaltyMessages", syncLoyaltyMessages),
     automations: await runStep("automations", syncAutomations),

@@ -59,7 +59,19 @@ export default async function DashboardPage({
       where,
       orderBy: { brandName: "asc" },
       include: {
-        snapshots: { where: { fieldName: "creditConsumption.total" }, orderBy: { capturedAt: "asc" } },
+        snapshots: {
+          where: {
+            fieldName: {
+              in: [
+                "creditConsumption.total",
+                "creditConsumption.campaigns",
+                "creditConsumption.automations",
+                "creditConsumption.loyalty",
+              ],
+            },
+          },
+          orderBy: { capturedAt: "asc" },
+        },
       },
     }),
     prisma.merchant.findMany({ select: { id: true, brandName: true }, orderBy: { brandName: "asc" } }),
@@ -127,7 +139,7 @@ export default async function DashboardPage({
           <div className="flex flex-col gap-5">
             <CreditConsumptionSection
               byMid={creditsByMid(mList)}
-              breakup={creditBreakupByMid(mList)}
+              breakup={creditBreakupByMid(mList, snapshotsByMerchant, { from: params.from, to: params.to })}
               {...wowCreditTrend(mList, snapshotsByMerchant, { from: params.from, to: params.to })}
             />
             <Suspense fallback={<Skeleton className="h-[352px] w-full rounded-xl" />}>

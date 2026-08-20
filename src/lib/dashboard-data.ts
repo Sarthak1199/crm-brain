@@ -106,24 +106,37 @@ export function creditsByMid(merchants: SerializedMerchant[], limit = BAR_CHART_
     }));
 }
 
-export function creditBreakupByMid(merchants: SerializedMerchant[], limit = BAR_CHART_LIMIT) {
-  const withBreakup = merchants.map((m) => {
-    const breakup = (m.creditConsumptionBreakup ?? {}) as {
-      total?: number;
-      campaigns?: number;
-      loyalty?: number;
-      automations?: number;
-    };
-    return {
-      name: m.brandName,
-      total: breakup.total ?? 0,
-      campaigns: breakup.campaigns ?? 0,
-      loyalty: breakup.loyalty ?? 0,
-      automations: breakup.automations ?? 0,
-    };
-  });
+// Sums the per-week campaign/automation/loyalty snapshots (from Redash query
+// 11147, synced weekly) that fall inside the selected date range — genuinely
+// date-filterable, unlike the old lifetime-only Merchant.creditConsumptionBreakup.
+export function creditBreakupByMid(
+  merchants: SerializedMerchant[],
+  snapshotsByMerchant: Record<string, SerializedSnapshot[]>,
+  dateRange: { from?: string; to?: string } = {},
+  limit = BAR_CHART_LIMIT
+) {
+  function sumField(merchantId: string, fieldName: string) {
+    const snaps = snapshotsByMerchant[merchantId] ?? [];
+    return snaps
+      .filter((s) => s.fieldName === fieldName)
+      .filter((s) => {
+        const weekKey = new Date(s.capturedAt).toISOString().slice(0, 10);
+        if (dateRange.from && weekKey < dateRange.from) return false;
+        if (dateRange.to && weekKey > dateRange.to) return false;
+        return true;
+      })
+      .reduce((a, s) => a + s.value, 0);
+  }
+
+  const withBreakup = merchants.map((m) => ({
+    name: m.brandName,
+    campaigns: sumField(m.id, "creditConsumption.campaigns"),
+    loyalty: sumField(m.id, "creditConsumption.loyalty"),
+    automations: sumField(m.id, "creditConsumption.automations"),
+  }));
 
   return withBreakup
+    .map((r) => ({ ...r, total: r.campaigns + r.loyalty + r.automations }))
     .sort((a, b) => b.total - a.total)
     .slice(0, limit)
     .map(({ total: _total, ...rest }) => rest);
@@ -142,7 +155,7 @@ export function wowCreditTrend(
   const weekMap = new Map<string, Record<string, number | string>>();
 
   for (const m of topMerchants) {
-    const snaps = snapshotsByMerchant[m.id] ?? [];
+    const snaps = (snapshotsByMerchant[m.id] ?? []).filter((s) => s.fieldName === "creditConsumption.total");
     for (const s of snaps) {
       const weekKey = new Date(s.capturedAt).toISOString().slice(0, 10);
       if (dateRange.from && weekKey < dateRange.from) continue;

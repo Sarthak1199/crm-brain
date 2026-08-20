@@ -13,7 +13,7 @@ const REDASH_QUERY_LABELS = {
   crmAdoption: "Redash: CRM Overview Metrics",
   crmWeeklyTrend: "Redash: Overall Weekly Trend",
   crmCreditPrePost: "Redash: Marketing Credit Pre/Post",
-  crmCreditMonthly: "Redash: Month Overview (per MID)",
+  creditConsumptionBreakup: "Redash: Credit Consumption Breakup (per MID)",
   loyaltyFunnel: "Redash: Loyalty Point Program Funnel",
   loyaltyMessages: "Redash: Loyalty Messages Tracking",
   automationPerRule: "Redash: Per-rule Automation Performance",
@@ -51,11 +51,8 @@ export const CHART_SOURCES = {
   ],
   salesStatus: [GSHEET_SOURCE_LINKS.crmLoyaltyClosures],
   creditPrePost: [REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.crmCreditPrePost]],
-  creditBreakdown: [
-    REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.loyaltyMessages],
-    REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.automationPerRule],
-  ],
-  wowByMid: [REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.crmCreditMonthly]],
+  creditBreakdown: [REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.creditConsumptionBreakup]],
+  wowByMid: [REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.creditConsumptionBreakup]],
   wowOverall: [REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.crmWeeklyTrend]],
   adoptionStats: [
     REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.loyaltyFunnel],

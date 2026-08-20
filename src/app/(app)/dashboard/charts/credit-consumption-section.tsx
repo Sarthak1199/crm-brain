@@ -59,7 +59,6 @@ export function CreditConsumptionSection({
         title="Consumption Breakdown"
         description="Top merchants, by category"
         sources={CHART_SOURCES.creditBreakdown}
-        latest
       >
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">

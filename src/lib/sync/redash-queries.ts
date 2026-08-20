@@ -66,18 +66,23 @@ export async function fetchCrmCreditPrePost() {
   return rows as unknown as CrmCreditPrePostRow[];
 }
 
-export type CrmCreditMonthlyRow = {
-  Month: string; // "2026-07"
-  "Consumed (₹)": number;
-  "Recharged (₹)": number;
-  "Net Change (₹)": number;
+export type CreditConsumptionBreakupRow = {
+  "Merchant Name": string;
+  "Merchant ID": number;
+  "CRM Total (₹)": number;
+  "Campaign (₹)": number;
+  "Automation (₹)": number;
+  "Loyalty (₹)": number;
 };
 
-export async function fetchCrmCreditMonthly(merchantId: number) {
-  const rows = await runRedashQuery(REDASH_QUERY_IDS.crmCreditMonthly, {
-    merchant_id: String(merchantId),
+// Returns one row per merchant with the CUMULATIVE total for the trailing
+// `weekCount` weeks — not a per-week series. weekCount is a Redash "text"
+// param, so it must be passed as a string or the request 400s.
+export async function fetchCreditConsumptionBreakup(weekCount: number) {
+  const rows = await runRedashQuery(REDASH_QUERY_IDS.creditConsumptionBreakup, {
+    weekCount: String(weekCount),
   });
-  return rows as unknown as CrmCreditMonthlyRow[];
+  return rows as unknown as CreditConsumptionBreakupRow[];
 }
 
 export type LoyaltyFunnelRow = {
