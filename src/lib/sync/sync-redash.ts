@@ -219,11 +219,17 @@ export async function syncCreditConsumptionByWeek() {
   const requests: Request[] = [...weeks.map((w): Request => ({ kind: "week", w })), { kind: "l30" }];
 
   const fetched = await mapWithConcurrency(requests, requests.length, async (req) => {
-    const [start, end] =
-      req.kind === "week"
-        ? [new Date(weekAnchor - req.w * WEEK_MS), new Date(weekAnchor - (req.w - 1) * WEEK_MS)]
-        : [new Date(realNow - 28 * DAY_MS), new Date(realNow)];
-    const rows = await fetchCreditConsumptionBreakup(start, end);
+    const start =
+      req.kind === "week" ? new Date(weekAnchor - req.w * WEEK_MS) : new Date(realNow - 28 * DAY_MS);
+    // fetchCreditConsumptionBreakup's `end` is inclusive of its whole
+    // calendar day. For a week, the natural end (weekAnchor - (w-1)*WEEK_MS)
+    // is EXCLUSIVE — it's also the next week's start — so it must be backed
+    // off a day, or that boundary day gets pulled into (and double-counted
+    // across) both adjacent weeks. l30's end is a literal "as of now" cutoff,
+    // not a shared boundary, so it's left as-is.
+    const queryEnd =
+      req.kind === "week" ? new Date(weekAnchor - (req.w - 1) * WEEK_MS - DAY_MS) : new Date(realNow);
+    const rows = await fetchCreditConsumptionBreakup(start, queryEnd);
     return { req, capturedAt: start, rows };
   });
 
@@ -308,8 +314,11 @@ export async function syncCustomersReachedByWeek() {
 
   const fetched = await mapWithConcurrency(weeks, weeks.length, async (w) => {
     const start = new Date(weekAnchor - w * WEEK_MS);
-    const end = new Date(weekAnchor - (w - 1) * WEEK_MS);
-    const rows = await fetchCustomerReachBreakup(start, end);
+    // See syncCreditConsumptionByWeek for why this boundary is backed off a
+    // day — it's shared with the next week and would otherwise be
+    // double-counted across both.
+    const queryEnd = new Date(weekAnchor - (w - 1) * WEEK_MS - DAY_MS);
+    const rows = await fetchCustomerReachBreakup(start, queryEnd);
     return { capturedAt: start, rows };
   });
 

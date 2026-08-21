@@ -75,22 +75,33 @@ export type CreditConsumptionBreakupRow = {
   "Loyalty (₹)": number;
 };
 
-// Returns one row per merchant totaled over [start, end]. The query was
-// originally a "trailing weekCount weeks" cumulative param (weekCount, text
-// type) but was changed upstream in Redash to an explicit date_range param —
-// passing weekCount now 400s with "incompatible with their definitions".
-// An explicit window is actually simpler for us: each call already returns
-// that window's own total, no cumulative-diffing needed.
+// Returns one row per merchant totaled over [start, end], both treated as
+// calendar dates the query includes in full — it does
+// `< DATE_ADD('{{date_range.end}}', INTERVAL 1 DAY)`, which is already the
+// correct way to make `end` inclusive of its whole day. Callers whose `end`
+// is really an EXCLUSIVE boundary shared with an adjacent window (e.g. a
+// week's end == the next week's start) must pass `end` minus a day
+// themselves — otherwise the boundary day gets pulled into both windows
+// and double-counted (confirmed via direct Redash pulls: summing weeks
+// using the raw shared boundary overcounted some actively-transacting
+// merchants by 10-55% vs a single equivalent-span query). Callers whose
+// `end` is a literal "as of now" cutoff (e.g. a trailing-N-days figure)
+// should keep passing it unadjusted, since DATE_ADD's inclusive-of-today
+// behavior is exactly what they want.
 //
-// Plain dates only (no time-of-day) — the query itself does
-// `< DATE_ADD('{{date_range.end}}', INTERVAL 1 DAY)`, already the correct
-// way to make `end` inclusive of its whole day. Passing "23:59:59" on top
-// of that pushed the upper bound a further ~23 hours into the *next* day,
-// silently pulling one extra day of spend into every window.
+// Also plain dates only (no time-of-day) for the same DATE_ADD reason —
+// appending "23:59:59" on top would push the boundary a further ~23 hours
+// into the next day.
+//
+// max_age: 0 forces a fresh recompute rather than a possibly-stale cached
+// result for this (query, params) pair — this backs a P0 financial-accuracy
+// figure, so it shouldn't ever serve a result older than the call itself.
 export async function fetchCreditConsumptionBreakup(start: Date, end: Date) {
-  const rows = await runRedashQuery(REDASH_QUERY_IDS.creditConsumptionBreakup, {
-    date_range: { start: isoDate(start), end: isoDate(end) },
-  });
+  const rows = await runRedashQuery(
+    REDASH_QUERY_IDS.creditConsumptionBreakup,
+    { date_range: { start: isoDate(start), end: isoDate(end) } },
+    0
+  );
   return rows as unknown as CreditConsumptionBreakupRow[];
 }
 
@@ -104,11 +115,13 @@ export type CustomerReachBreakupRow = {
 
 // Distinct customers reached per channel over [start, end] — a headcount
 // (query 11148), not the ₹ spend that 11147 returns. Same date_range
-// shape and window semantics as fetchCreditConsumptionBreakup.
+// shape and boundary semantics as fetchCreditConsumptionBreakup.
 export async function fetchCustomerReachBreakup(start: Date, end: Date) {
-  const rows = await runRedashQuery(REDASH_QUERY_IDS.customerReachBreakup, {
-    date_range: { start: isoDate(start), end: isoDate(end) },
-  });
+  const rows = await runRedashQuery(
+    REDASH_QUERY_IDS.customerReachBreakup,
+    { date_range: { start: isoDate(start), end: isoDate(end) } },
+    0
+  );
   return rows as unknown as CustomerReachBreakupRow[];
 }
 
