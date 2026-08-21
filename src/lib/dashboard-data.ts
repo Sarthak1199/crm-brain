@@ -146,47 +146,6 @@ export function creditBreakupByMid(
     .map(({ total: _total, ...rest }) => rest);
 }
 
-// Same per-merchant campaign/automation/loyalty breakdown as
-// creditBreakupByMid, but for the "Customers Reached" → View Details table:
-// every merchant (no top-N slice) and carrying id/dotpeMid so the table can
-// link back to the merchant and show MID, not just a chart label.
-export function creditBreakupTable(
-  merchants: SerializedMerchant[],
-  snapshotsByMerchant: Record<string, SerializedSnapshot[]>,
-  dateRange: { from?: string; to?: string } = {}
-) {
-  function sumField(merchantId: string, fieldName: string) {
-    const snaps = snapshotsByMerchant[merchantId] ?? [];
-    return snaps
-      .filter((s) => s.fieldName === fieldName)
-      .filter((s) => {
-        const weekKey = new Date(s.capturedAt).toISOString().slice(0, 10);
-        if (dateRange.from && weekKey < dateRange.from) return false;
-        if (dateRange.to && weekKey > dateRange.to) return false;
-        return true;
-      })
-      .reduce((a, s) => a + s.value, 0);
-  }
-
-  return merchants
-    .map((m) => {
-      const campaigns = sumField(m.id, "creditConsumption.campaigns");
-      const loyalty = sumField(m.id, "creditConsumption.loyalty");
-      const automations = sumField(m.id, "creditConsumption.automations");
-      return {
-        id: m.id,
-        brandName: m.brandName,
-        dotpeMid: m.dotpeMid,
-        totalStores: m.totalStores,
-        campaigns,
-        loyalty,
-        automations,
-        total: campaigns + loyalty + automations,
-      };
-    })
-    .sort((a, b) => b.total - a.total);
-}
-
 // "Pre vs Post CRM Credits" + "Consumption Breakdown" → View Details table:
 // every merchant's pre/post CRM credit totals (lifetime, same source as the
 // Pre vs Post chart) alongside the same per-category breakdown as
@@ -267,22 +226,75 @@ export function adoptionStats(merchants: SerializedMerchant[]) {
     (m) => Array.isArray(m.automationsRules) && (m.automationsRules as string[]).length > 0
   ).length;
   const rfmCampaignsSent = merchants.reduce((a, m) => a + m.campaignsUsingRfm, 0);
-  const totalContactsReached = merchants.reduce((a, m) => a + m.totalContactsReached, 0);
 
-  const byChannel = merchants
-    .filter((m) => m.totalContactsReached > 0 || m.automationsTotalSent > 0 || m.campaignsContactsReached > 0)
-    .map((m) => ({
-      name: m.brandName,
-      loyalty: m.customerCount,
-      automations: m.automationsTotalSent,
-      campaigns: m.campaignsContactsReached,
-      total: m.customerCount + m.automationsTotalSent + m.campaignsContactsReached,
-    }))
+  return { loyaltySetups, automationSetups, rfmCampaignsSent };
+}
+
+// "Customers Reached" chart + its View Details table — distinct customers
+// reached per channel (a headcount, from Redash query 11148 via the
+// customersReached.* snapshots), genuinely date-range-filterable. This
+// used to read lifetime/mismatched fields (total_enrolled, a cumulative
+// automations-sent counter, a non-date-filterable contacts total from the
+// CRM Overview query) that neither matched "customers reached" nor
+// responded to the dashboard's date filter at all.
+function sumCustomersReachedField(
+  snaps: SerializedSnapshot[],
+  fieldName: string,
+  dateRange: { from?: string; to?: string }
+) {
+  return snaps
+    .filter((s) => s.fieldName === fieldName)
+    .filter((s) => {
+      const weekKey = new Date(s.capturedAt).toISOString().slice(0, 10);
+      if (dateRange.from && weekKey < dateRange.from) return false;
+      if (dateRange.to && weekKey > dateRange.to) return false;
+      return true;
+    })
+    .reduce((a, s) => a + s.value, 0);
+}
+
+export function customersReachedByChannel(
+  merchants: SerializedMerchant[],
+  snapshotsByMerchant: Record<string, SerializedSnapshot[]>,
+  dateRange: { from?: string; to?: string } = {},
+  limit = CUSTOMERS_REACHED_CHART_LIMIT
+) {
+  return merchants
+    .map((m) => {
+      const snaps = snapshotsByMerchant[m.id] ?? [];
+      const campaigns = sumCustomersReachedField(snaps, "customersReached.campaigns", dateRange);
+      const loyalty = sumCustomersReachedField(snaps, "customersReached.loyalty", dateRange);
+      const automations = sumCustomersReachedField(snaps, "customersReached.automations", dateRange);
+      return { name: m.brandName, campaigns, loyalty, automations, total: campaigns + loyalty + automations };
+    })
     .sort((a, b) => b.total - a.total)
-    .slice(0, CUSTOMERS_REACHED_CHART_LIMIT)
+    .slice(0, limit)
     .map(({ total: _total, ...rest }) => rest);
+}
 
-  return { loyaltySetups, automationSetups, rfmCampaignsSent, totalContactsReached, byChannel };
+export function customersReachedTable(
+  merchants: SerializedMerchant[],
+  snapshotsByMerchant: Record<string, SerializedSnapshot[]>,
+  dateRange: { from?: string; to?: string } = {}
+) {
+  return merchants
+    .map((m) => {
+      const snaps = snapshotsByMerchant[m.id] ?? [];
+      const campaigns = sumCustomersReachedField(snaps, "customersReached.campaigns", dateRange);
+      const loyalty = sumCustomersReachedField(snaps, "customersReached.loyalty", dateRange);
+      const automations = sumCustomersReachedField(snaps, "customersReached.automations", dateRange);
+      return {
+        id: m.id,
+        brandName: m.brandName,
+        dotpeMid: m.dotpeMid,
+        totalStores: m.totalStores,
+        campaigns,
+        loyalty,
+        automations,
+        total: campaigns + loyalty + automations,
+      };
+    })
+    .sort((a, b) => b.total - a.total);
 }
 
 /**

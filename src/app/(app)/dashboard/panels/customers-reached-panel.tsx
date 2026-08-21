@@ -1,6 +1,6 @@
 "use client";
 
-import { formatInr } from "@/lib/format";
+import { formatNumber } from "@/lib/format";
 import { TypedAdoptionPanel, type CommonAdoptionRow, type ExtraColumn } from "./typed-adoption-panel";
 
 export type CustomersReachedRow = CommonAdoptionRow & {
@@ -16,28 +16,28 @@ const EXTRA_COLUMNS: ExtraColumn<CustomersReachedRow>[] = [
     label: "Automation",
     align: "right",
     accessor: (r) => r.automations,
-    render: (r) => formatInr(r.automations, { compact: true }),
+    render: (r) => formatNumber(r.automations),
   },
   {
     key: "campaigns",
     label: "Campaigns",
     align: "right",
     accessor: (r) => r.campaigns,
-    render: (r) => formatInr(r.campaigns, { compact: true }),
+    render: (r) => formatNumber(r.campaigns),
   },
   {
     key: "loyalty",
     label: "Loyalty",
     align: "right",
     accessor: (r) => r.loyalty,
-    render: (r) => formatInr(r.loyalty, { compact: true }),
+    render: (r) => formatNumber(r.loyalty),
   },
   {
     key: "total",
-    label: "Total Credit Consumption",
+    label: "Total Customers Reached",
     align: "right",
     accessor: (r) => r.total,
-    render: (r) => formatInr(r.total, { compact: true }),
+    render: (r) => formatNumber(r.total),
   },
 ];
 
@@ -52,8 +52,8 @@ export function CustomersReachedPanel({
 }) {
   return (
     <TypedAdoptionPanel
-      title="Customers Reached — Credit Consumption"
-      description="Credit consumption by merchant, broken down by Automation, Campaigns, and Loyalty."
+      title="Customers Reached — Per Merchant"
+      description="Distinct customers reached by merchant, broken down by Automation, Campaigns, and Loyalty."
       rows={rows}
       extraColumns={EXTRA_COLUMNS}
       defaultSortKey="total"

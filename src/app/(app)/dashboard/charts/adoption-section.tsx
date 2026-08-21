@@ -135,12 +135,14 @@ export function AdoptionSection({
   merchants,
   loyaltyLicensedCount,
   crmActivatedCount,
+  customersReachedByChannel,
   customersReachedRows,
 }: {
   data: ReturnType<typeof adoptionStats>;
   merchants: AdoptionRow[];
   loyaltyLicensedCount: number;
   crmActivatedCount: number;
+  customersReachedByChannel: { name: string; campaigns: number; loyalty: number; automations: number }[];
   customersReachedRows: CustomersReachedRow[];
 }) {
   const [loyaltyOpen, setLoyaltyOpen] = useState(false);
@@ -149,6 +151,7 @@ export function AdoptionSection({
   const [customersReachedOpen, setCustomersReachedOpen] = useState(false);
 
   const rfmMerchantCount = merchants.filter((m) => m.campaignsUsingRfm > 0).length;
+  const totalCustomersReached = customersReachedRows.reduce((a, r) => a + r.total, 0);
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
@@ -188,15 +191,14 @@ export function AdoptionSection({
 
       <ChartCard
         title="Customers Reached"
-        description={`${formatNumber(data.totalContactsReached)} total across all Mx — top merchants by channel below`}
+        description={`${formatNumber(totalCustomersReached)} distinct customers reached across all Mx — top merchants by channel below`}
         className="lg:col-span-3"
         sources={CHART_SOURCES.customersReached}
-        latest
         action={
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[12px] text-muted-foreground">
               <Users className="size-3.5" />
-              {formatNumber(data.totalContactsReached)} total
+              {formatNumber(totalCustomersReached)} total
             </div>
             <button
               type="button"
@@ -211,7 +213,7 @@ export function AdoptionSection({
       >
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data.byChannel} margin={{ top: 8, right: 8, left: 12, bottom: 0 }}>
+            <BarChart data={customersReachedByChannel} margin={{ top: 8, right: 8, left: 12, bottom: 0 }}>
               <CartesianGrid vertical={false} stroke={CHART_GRID} />
               <XAxis dataKey="name" tick={AXIS_TICK} axisLine={{ stroke: CHART_GRID }} tickLine={false} interval={0} angle={-15} textAnchor="end" height={50} />
               <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={40} />

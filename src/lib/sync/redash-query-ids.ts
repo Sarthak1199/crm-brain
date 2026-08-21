@@ -5,7 +5,8 @@ export const REDASH_QUERY_IDS = {
   crmAdoption: 10505, // CRM <> Overview Metrics
   crmWeeklyTrend: 11078, // CRM - Overall Weekly Trend (portfolio-wide, informational only)
   crmCreditPrePost: 11018, // CRM - Marketing Credit Pre/Post Activation
-  creditConsumptionBreakup: 11147, // CRM Credit Consumption Breakup — total/campaign/automation/loyalty, per merchant_id, trailing weekCount weeks
+  creditConsumptionBreakup: 11147, // CRM Credit Consumption Breakup — total/campaign/automation/loyalty (₹), per merchant_id, date_range
+  customerReachBreakup: 11148, // CRM Customer Reach Breakup — distinct customers reached per channel (count, not ₹), per merchant_id, date_range
   loyaltyFunnel: 10921, // Loyalty - Point Program Funnel
   loyaltyMessages: 11054, // Loyalty : Messages tracking
   automationPerRule: 10990, // Per-rule Automation Performance

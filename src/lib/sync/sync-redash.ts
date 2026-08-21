@@ -4,6 +4,7 @@ import {
   fetchAutomationPerformance,
   fetchCrmAdoption,
   fetchCreditConsumptionBreakup,
+  fetchCustomerReachBreakup,
   fetchCrmCreditPrePost,
   fetchCrmWeeklyTrend,
   fetchLoyaltyFunnel,
@@ -275,6 +276,64 @@ export async function syncCreditConsumptionByWeek() {
   return written;
 }
 
+/**
+ * Per-merchant weekly customers-reached, split by channel — same shape and
+ * week-anchoring as syncCreditConsumptionByWeek, but from query 11148
+ * (distinct customer counts, not ₹ spend). Backs the "Customers Reached"
+ * chart, which previously read lifetime/mismatched fields (total_enrolled,
+ * a cumulative automations-sent counter, a non-date-filterable contacts
+ * total) that neither reflected the selected date range nor consistently
+ * meant "distinct customers reached."
+ */
+export async function syncCustomersReachedByWeek() {
+  const merchants = await prisma.merchant.findMany({ select: { id: true, dotpeMid: true } });
+  const merchantIdByMid = new Map(merchants.map((m) => [normalizeMid(m.dotpeMid), m.id]));
+
+  const weekAnchor = currentWeekAnchor();
+  const weeks = Array.from({ length: CREDIT_BREAKUP_MAX_WEEKS }, (_, i) => i + 1);
+
+  const fetched = await mapWithConcurrency(weeks, weeks.length, async (w) => {
+    const start = new Date(weekAnchor - w * WEEK_MS);
+    const end = new Date(weekAnchor - (w - 1) * WEEK_MS);
+    const rows = await fetchCustomerReachBreakup(start, end);
+    return { capturedAt: start, rows };
+  });
+
+  let written = 0;
+  for (const { capturedAt, rows } of fetched) {
+    for (const row of rows) {
+      const merchantIdNum = row["Merchant ID"];
+      const merchantId = merchantIdByMid.get(normalizeMid(String(merchantIdNum)));
+      if (!merchantId) continue;
+
+      const campaigns = row["Campaign Reach"] ?? 0;
+      const automations = row["Automation Reach"] ?? 0;
+      const loyalty = row["Loyalty Reach"] ?? 0;
+      const fields: Record<string, number> = {
+        "customersReached.total": campaigns + automations + loyalty,
+        "customersReached.campaigns": campaigns,
+        "customersReached.automations": automations,
+        "customersReached.loyalty": loyalty,
+      };
+
+      for (const [fieldName, value] of Object.entries(fields)) {
+        try {
+          await prisma.merchantSnapshot.upsert({
+            where: { merchantId_fieldName_capturedAt: { merchantId, fieldName, capturedAt } },
+            create: { merchantId, fieldName, value, capturedAt },
+            update: { value },
+          });
+          written++;
+        } catch (error) {
+          console.error(`syncCustomersReachedByWeek: skipped ${merchantIdNum}/${fieldName}`, error);
+        }
+      }
+    }
+  }
+
+  return written;
+}
+
 /** Step 4: loyalty program status, enrollment, and points. Update-only. */
 export async function syncLoyaltyFunnel() {
   const rows = await fetchLoyaltyFunnel();
@@ -439,6 +498,15 @@ export async function syncRedashLight() {
 export async function syncRedashCreditWeekly() {
   return withSyncRun("REDASH", async () => ({
     creditConsumptionByWeek: await runStep("creditConsumptionByWeek", syncCreditConsumptionByWeek),
+  }));
+}
+
+// Same cost profile as syncRedashCreditWeekly (13 parallel Redash calls,
+// ~220s) — its own cron/SyncRun for the same reason, and deliberately not
+// part of the interactive "Sync now" button either.
+export async function syncRedashCustomersReachedWeekly() {
+  return withSyncRun("REDASH", async () => ({
+    customersReachedByWeek: await runStep("customersReachedByWeek", syncCustomersReachedByWeek),
   }));
 }
 

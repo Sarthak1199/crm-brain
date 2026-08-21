@@ -94,6 +94,24 @@ export async function fetchCreditConsumptionBreakup(start: Date, end: Date) {
   return rows as unknown as CreditConsumptionBreakupRow[];
 }
 
+export type CustomerReachBreakupRow = {
+  "Merchant Name": string;
+  "Merchant ID": number;
+  "Campaign Reach": number | null;
+  "Automation Reach": number | null;
+  "Loyalty Reach": number | null;
+};
+
+// Distinct customers reached per channel over [start, end] — a headcount
+// (query 11148), not the ₹ spend that 11147 returns. Same date_range
+// shape and window semantics as fetchCreditConsumptionBreakup.
+export async function fetchCustomerReachBreakup(start: Date, end: Date) {
+  const rows = await runRedashQuery(REDASH_QUERY_IDS.customerReachBreakup, {
+    date_range: { start: isoDate(start), end: isoDate(end) },
+  });
+  return rows as unknown as CustomerReachBreakupRow[];
+}
+
 export type LoyaltyFunnelRow = {
   program_name: string;
   status: string;

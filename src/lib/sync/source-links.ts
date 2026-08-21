@@ -14,6 +14,7 @@ const REDASH_QUERY_LABELS = {
   crmWeeklyTrend: "Redash: Overall Weekly Trend",
   crmCreditPrePost: "Redash: Marketing Credit Pre/Post",
   creditConsumptionBreakup: "Redash: Credit Consumption Breakup (per MID)",
+  customerReachBreakup: "Redash: Customer Reach Breakup (per MID)",
   loyaltyFunnel: "Redash: Loyalty Point Program Funnel",
   loyaltyMessages: "Redash: Loyalty Messages Tracking",
   automationPerRule: "Redash: Per-rule Automation Performance",
@@ -59,11 +60,7 @@ export const CHART_SOURCES = {
     REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.automationPerRule],
     REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.crmAdoption],
   ],
-  customersReached: [
-    REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.loyaltyFunnel],
-    REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.automationPerRule],
-    REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.crmAdoption],
-  ],
+  customersReached: [REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.customerReachBreakup]],
   productStatus: [GSHEET_SOURCE_LINKS.roadmap],
   onboarding: [GSHEET_SOURCE_LINKS.loyaltyOnboarding],
 } satisfies Record<string, SourceLink[]>;

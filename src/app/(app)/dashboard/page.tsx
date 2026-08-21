@@ -12,9 +12,10 @@ import {
   activationFunnelByMx,
   adoptionStats,
   creditBreakupByMid,
-  creditBreakupTable,
   creditConsumptionTable,
   creditsByMid,
+  customersReachedByChannel,
+  customersReachedTable,
   productStatusStages,
   requestTypeStats,
   salesStatus,
@@ -88,6 +89,10 @@ export default async function DashboardPage({
                 "creditConsumption.campaigns",
                 "creditConsumption.automations",
                 "creditConsumption.loyalty",
+                "customersReached.total",
+                "customersReached.campaigns",
+                "customersReached.automations",
+                "customersReached.loyalty",
               ],
             },
             ...snapshotDateFilter,
@@ -178,7 +183,14 @@ export default async function DashboardPage({
             merchants={mList}
             loyaltyLicensedCount={loyaltyLicensedIds.size}
             crmActivatedCount={crmActivatedIds.size}
-            customersReachedRows={creditBreakupTable(mList, snapshotsByMerchant, { from: params.from, to: params.to })}
+            customersReachedByChannel={customersReachedByChannel(mList, snapshotsByMerchant, {
+              from: params.from,
+              to: params.to,
+            })}
+            customersReachedRows={customersReachedTable(mList, snapshotsByMerchant, {
+              from: params.from,
+              to: params.to,
+            })}
           />
         </section>
 
