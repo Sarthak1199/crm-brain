@@ -55,6 +55,21 @@ export default async function DashboardPage({
     ];
   }
 
+  // Bound snapshots by the selected date range at the query level — every
+  // downstream dashboard-data.ts function re-filters by date anyway, but
+  // without this the query pulls every merchant's *entire* snapshot
+  // history (4 fields x every synced week, growing weekly) on every
+  // render, including on every filter change, then throws almost all of
+  // it away in JS. That full-history transfer is what made changing the
+  // date filter slow — narrowing the query itself is the actual fix, not
+  // a debounce (there's no rapid-fire input here to debounce: date inputs
+  // and preset buttons each commit a single navigation).
+  const capturedAtFilter: Prisma.DateTimeFilter = {};
+  if (params.from) capturedAtFilter.gte = new Date(params.from);
+  if (params.to) capturedAtFilter.lte = new Date(`${params.to}T23:59:59.999Z`);
+  const snapshotDateFilter: Prisma.MerchantSnapshotWhereInput =
+    params.from || params.to ? { capturedAt: capturedAtFilter } : {};
+
   const [merchants, allMerchants, roadmapItems, supportRequests, onboardingRequests] = await Promise.all([
     prisma.merchant.findMany({
       where,
@@ -70,6 +85,7 @@ export default async function DashboardPage({
                 "creditConsumption.loyalty",
               ],
             },
+            ...snapshotDateFilter,
           },
           orderBy: { capturedAt: "asc" },
         },

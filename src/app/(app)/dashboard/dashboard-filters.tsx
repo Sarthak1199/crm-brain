@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { ChevronDown, Search, X } from "lucide-react";
+import { ChevronDown, Loader2, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,6 +40,11 @@ export function DashboardFilters({
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // Marks the navigation as a transition so isPending flips to true the
+  // instant a filter is clicked — visible feedback before the new RSC
+  // payload arrives, rather than the old charts just sitting static with
+  // no indication anything is happening until the swap completes.
+  const [isPending, startTransition] = useTransition();
 
   const from = searchParams.get("from") ?? "";
   const to = searchParams.get("to") ?? "";
@@ -49,7 +54,9 @@ export function DashboardFilters({
     (mutate: (params: URLSearchParams) => void, mode: "push" | "replace" = "push") => {
       const params = new URLSearchParams(searchParams.toString());
       mutate(params);
-      router[mode](`${pathname}?${params.toString()}`);
+      startTransition(() => {
+        router[mode](`${pathname}?${params.toString()}`);
+      });
     },
     [pathname, router, searchParams]
   );
@@ -107,7 +114,10 @@ export function DashboardFilters({
   }, [merchantOptions, query]);
 
   return (
-    <div className="flex flex-wrap items-center gap-2.5">
+    <div className={cn("flex flex-wrap items-center gap-2.5 transition-opacity", isPending && "opacity-60")}>
+      {isPending ? (
+        <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" aria-label="Updating..." />
+      ) : null}
       <div className="flex items-center gap-1.5">
         <Input
           type="date"
