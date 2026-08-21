@@ -227,21 +227,30 @@ export async function syncCreditConsumptionByWeek() {
     return { req, capturedAt: start, rows };
   });
 
-  let written = 0;
+  // One row at a time here would mean thousands of serial DB round-trips
+  // (merchants × 4 fields × 13 weeks) — that write phase, not the parallel
+  // Redash fetch above, was what actually blew past maxDuration and left
+  // later weeks unwritten. Flatten to individual upsert jobs and run them
+  // with bounded concurrency instead.
+  const l30Jobs: (() => Promise<void>)[] = [];
+  const snapshotJobs: (() => Promise<boolean>)[] = [];
+
   for (const { req, capturedAt, rows } of fetched) {
     if (req.kind === "l30") {
       for (const row of rows) {
         const merchantIdNum = row["Merchant ID"];
         const merchantId = merchantIdByMid.get(normalizeMid(String(merchantIdNum)));
         if (!merchantId) continue;
-        try {
-          await prisma.merchant.update({
-            where: { id: merchantId },
-            data: { creditConsumedL30: row["CRM Total (₹)"] ?? 0 },
-          });
-        } catch (error) {
-          console.error(`syncCreditConsumptionByWeek: failed to set creditConsumedL30 for ${merchantIdNum}`, error);
-        }
+        l30Jobs.push(async () => {
+          try {
+            await prisma.merchant.update({
+              where: { id: merchantId },
+              data: { creditConsumedL30: row["CRM Total (₹)"] ?? 0 },
+            });
+          } catch (error) {
+            console.error(`syncCreditConsumptionByWeek: failed to set creditConsumedL30 for ${merchantIdNum}`, error);
+          }
+        });
       }
       continue;
     }
@@ -259,21 +268,26 @@ export async function syncCreditConsumptionByWeek() {
       };
 
       for (const [fieldName, value] of Object.entries(fields)) {
-        try {
-          await prisma.merchantSnapshot.upsert({
-            where: { merchantId_fieldName_capturedAt: { merchantId, fieldName, capturedAt } },
-            create: { merchantId, fieldName, value, capturedAt },
-            update: { value },
-          });
-          written++;
-        } catch (error) {
-          console.error(`syncCreditConsumptionByWeek: skipped ${merchantIdNum}/${fieldName}/week ${req.w}`, error);
-        }
+        snapshotJobs.push(async () => {
+          try {
+            await prisma.merchantSnapshot.upsert({
+              where: { merchantId_fieldName_capturedAt: { merchantId, fieldName, capturedAt } },
+              create: { merchantId, fieldName, value, capturedAt },
+              update: { value },
+            });
+            return true;
+          } catch (error) {
+            console.error(`syncCreditConsumptionByWeek: skipped ${merchantIdNum}/${fieldName}/week ${req.w}`, error);
+            return false;
+          }
+        });
       }
     }
   }
 
-  return written;
+  await mapWithConcurrency(l30Jobs, 20, (job) => job());
+  const results = await mapWithConcurrency(snapshotJobs, 20, (job) => job());
+  return results.filter(Boolean).length;
 }
 
 /**
@@ -299,7 +313,10 @@ export async function syncCustomersReachedByWeek() {
     return { capturedAt: start, rows };
   });
 
-  let written = 0;
+  // See syncCreditConsumptionByWeek for why this is batched with bounded
+  // concurrency rather than one serial `await` per row.
+  const snapshotJobs: (() => Promise<boolean>)[] = [];
+
   for (const { capturedAt, rows } of fetched) {
     for (const row of rows) {
       const merchantIdNum = row["Merchant ID"];
@@ -317,21 +334,25 @@ export async function syncCustomersReachedByWeek() {
       };
 
       for (const [fieldName, value] of Object.entries(fields)) {
-        try {
-          await prisma.merchantSnapshot.upsert({
-            where: { merchantId_fieldName_capturedAt: { merchantId, fieldName, capturedAt } },
-            create: { merchantId, fieldName, value, capturedAt },
-            update: { value },
-          });
-          written++;
-        } catch (error) {
-          console.error(`syncCustomersReachedByWeek: skipped ${merchantIdNum}/${fieldName}`, error);
-        }
+        snapshotJobs.push(async () => {
+          try {
+            await prisma.merchantSnapshot.upsert({
+              where: { merchantId_fieldName_capturedAt: { merchantId, fieldName, capturedAt } },
+              create: { merchantId, fieldName, value, capturedAt },
+              update: { value },
+            });
+            return true;
+          } catch (error) {
+            console.error(`syncCustomersReachedByWeek: skipped ${merchantIdNum}/${fieldName}`, error);
+            return false;
+          }
+        });
       }
     }
   }
 
-  return written;
+  const results = await mapWithConcurrency(snapshotJobs, 20, (job) => job());
+  return results.filter(Boolean).length;
 }
 
 /** Step 4: loyalty program status, enrollment, and points. Update-only. */
