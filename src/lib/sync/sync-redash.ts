@@ -149,6 +149,34 @@ export async function syncCreditPrePost() {
 const CREDIT_BREAKUP_MAX_WEEKS = 13; // ~90 days — covers the dashboard's longest date-range preset
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+
+// Fixed reference point (a Monday, UTC midnight) for anchoring week
+// boundaries — see currentWeekAnchor() below for why this matters.
+const WEEK_ANCHOR_EPOCH_MS = Date.UTC(2020, 0, 6);
+
+// Floors "now" to a fixed weekly grid instead of using `now` directly as
+// the window's own edge. This is what makes repeated syncs within the same
+// real calendar week collide on the same MerchantSnapshot upsert key
+// (merchantId, fieldName, capturedAt) and overwrite each other, instead of
+// each accumulating a brand-new row.
+//
+// The previous version computed each week's start as `now - w*7*DAY_MS`
+// using the live clock at call time. Since `now` drifts continuously, two
+// syncs run minutes (or even the same day) apart never produced the exact
+// same capturedAt — every "Sync now" click and every daily cron run wrote
+// a whole new set of ~13-per-field rows on top of the previous ones rather
+// than replacing them. dashboard-data.ts's date-range sums then added
+// every one of those duplicates together, which is the actual cause of
+// wildly inflated numbers reported for specific merchants (e.g. a
+// merchant's 30-day loyalty figure coming out ~13x too high) — not a wrong
+// Redash query, param name, or category mislabeling; the query and field
+// mapping were both correct, but the same real week's true total got
+// counted once per historical sync run.
+function currentWeekAnchor(): number {
+  const weeksSinceEpoch = Math.floor((Date.now() - WEEK_ANCHOR_EPOCH_MS) / WEEK_MS);
+  return WEEK_ANCHOR_EPOCH_MS + weeksSinceEpoch * WEEK_MS;
+}
 
 /**
  * Step 3: per-merchant weekly credit consumption, split by campaign/
@@ -177,7 +205,14 @@ export async function syncCreditConsumptionByWeek() {
   const merchants = await prisma.merchant.findMany({ select: { id: true, dotpeMid: true } });
   const merchantIdByMid = new Map(merchants.map((m) => [normalizeMid(m.dotpeMid), m.id]));
 
-  const now = Date.now();
+  // Weekly windows are anchored to a fixed grid (see currentWeekAnchor) so
+  // repeated syncs collide and overwrite instead of accumulating duplicate
+  // rows. creditConsumedL30 isn't stored as a MerchantSnapshot — it's
+  // always a plain overwrite on Merchant — so it uses the real clock and
+  // stays a genuine trailing-28-days-as-of-today figure, not floored to
+  // the weekly grid.
+  const weekAnchor = currentWeekAnchor();
+  const realNow = Date.now();
   const weeks = Array.from({ length: CREDIT_BREAKUP_MAX_WEEKS }, (_, i) => i + 1);
   type Request = { kind: "week"; w: number } | { kind: "l30" };
   const requests: Request[] = [...weeks.map((w): Request => ({ kind: "week", w })), { kind: "l30" }];
@@ -185,8 +220,8 @@ export async function syncCreditConsumptionByWeek() {
   const fetched = await mapWithConcurrency(requests, requests.length, async (req) => {
     const [start, end] =
       req.kind === "week"
-        ? [new Date(now - req.w * 7 * DAY_MS), new Date(now - (req.w - 1) * 7 * DAY_MS)]
-        : [new Date(now - 28 * DAY_MS), new Date(now)];
+        ? [new Date(weekAnchor - req.w * WEEK_MS), new Date(weekAnchor - (req.w - 1) * WEEK_MS)]
+        : [new Date(realNow - 28 * DAY_MS), new Date(realNow)];
     const rows = await fetchCreditConsumptionBreakup(start, end);
     return { req, capturedAt: start, rows };
   });

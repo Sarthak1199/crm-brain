@@ -81,9 +81,15 @@ export type CreditConsumptionBreakupRow = {
 // passing weekCount now 400s with "incompatible with their definitions".
 // An explicit window is actually simpler for us: each call already returns
 // that window's own total, no cumulative-diffing needed.
+//
+// Plain dates only (no time-of-day) — the query itself does
+// `< DATE_ADD('{{date_range.end}}', INTERVAL 1 DAY)`, already the correct
+// way to make `end` inclusive of its whole day. Passing "23:59:59" on top
+// of that pushed the upper bound a further ~23 hours into the *next* day,
+// silently pulling one extra day of spend into every window.
 export async function fetchCreditConsumptionBreakup(start: Date, end: Date) {
   const rows = await runRedashQuery(REDASH_QUERY_IDS.creditConsumptionBreakup, {
-    date_range: { start: `${isoDate(start)} 00:00:00`, end: `${isoDate(end)} 23:59:59` },
+    date_range: { start: isoDate(start), end: isoDate(end) },
   });
   return rows as unknown as CreditConsumptionBreakupRow[];
 }
