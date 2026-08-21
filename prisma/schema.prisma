@@ -68,6 +68,13 @@ model User {
   // True for accounts created with a generated temp password — forces a
   // password change on next login before the rest of the app is reachable.
   mustResetPassword Boolean  @default(false)
+  // Login lockout: counts consecutive failed attempts since the last
+  // success; failedLoginAttempts resets to 0 on a successful login.
+  // lockedUntil blocks further attempts (even with the correct password)
+  // until that time passes — serverless has no reliable in-memory state
+  // across invocations, so this has to be persisted, not counted in memory.
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
