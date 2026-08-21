@@ -63,7 +63,7 @@ function bestApprovalStatus(approvals: ApprovalRow[]): ApprovalStatus | null {
   return null;
 }
 
-export function TemplatesTable({ rows }: { rows: TemplateRow[] }) {
+export function TemplatesTable({ rows, canEdit }: { rows: TemplateRow[]; canEdit: boolean }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { sorted, sortKey, direction, toggleSort } = useSort(rows, ACCESSORS, {
     key: "createdAt",
@@ -151,7 +151,7 @@ export function TemplatesTable({ rows }: { rows: TemplateRow[] }) {
         </TableBody>
       </Table>
 
-      <TemplateDetailSheet row={selected} onOpenChange={(open) => !open && setSelectedId(null)} />
+      <TemplateDetailSheet row={selected} canEdit={canEdit} onOpenChange={(open) => !open && setSelectedId(null)} />
     </div>
   );
 }

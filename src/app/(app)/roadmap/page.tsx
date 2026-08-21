@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { canMutate } from "@/lib/authz";
 import { serializeRoadmapItem } from "@/lib/serialize";
 import { PageHeader } from "@/components/page-header";
 import { SyncStatusBar } from "@/components/sync-status-bar";
@@ -28,6 +30,8 @@ export default async function RoadmapPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
+  const session = await auth();
+  const canEdit = canMutate(session?.user?.role, "roadmap");
 
   const where: Prisma.RoadmapItemWhereInput = {};
   if (params.status && params.status !== "all") where.status = params.status;
@@ -56,7 +60,7 @@ export default async function RoadmapPage({
           title="Product Roadmap"
           description="Synced from the CRM product team's roadmap sheet — click a row for the full brief."
         />
-        <RoadmapTicketForm />
+        {canEdit ? <RoadmapTicketForm /> : null}
       </div>
 
       <div className="sticky top-16 z-[5] -mx-6 mb-5 border-b border-border bg-background/95 px-6 py-3 backdrop-blur md:-mx-8 md:px-8">
@@ -66,7 +70,7 @@ export default async function RoadmapPage({
         </div>
       </div>
 
-      <RoadmapTable rows={rows} />
+      <RoadmapTable rows={rows} canEdit={canEdit} />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import { Bug, Building2, IndianRupee, Lightbulb } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { canMutate } from "@/lib/authz";
 import { serializeSupportRequest } from "@/lib/serialize";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
@@ -17,6 +19,8 @@ export default async function RequestsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
+  const session = await auth();
+  const canEdit = canMutate(session?.user?.role);
 
   const where: Prisma.SupportRequestWhereInput = {};
   if (params.type === "Bug" || params.type === "Feature") {
@@ -64,7 +68,7 @@ export default async function RequestsPage({
           title="Bug & Feature Requests"
           description="Requests logged against merchants, with their footprint at time of filing."
         />
-        <RequestForm merchants={merchantOptions} />
+        {canEdit ? <RequestForm merchants={merchantOptions} /> : null}
       </div>
 
       <div className="mb-5">
@@ -81,7 +85,7 @@ export default async function RequestsPage({
         />
       </div>
 
-      <RequestsTable rows={rows} merchants={merchantOptions} />
+      <RequestsTable rows={rows} merchants={merchantOptions} canEdit={canEdit} />
     </div>
   );
 }

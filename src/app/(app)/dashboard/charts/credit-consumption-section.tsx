@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { ArrowUpRight } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -16,28 +18,47 @@ import { ChartCard } from "@/components/chart-card";
 import { formatInr, formatNumber, formatDate } from "@/lib/format";
 import { CHART_BRAND, CHART_GRAY, CHART_GRID, CHART_AXIS, SERIES_COLORS, tooltipContentStyle, tooltipLabelStyle } from "./chart-theme";
 import { CHART_SOURCES } from "@/lib/sync/source-links";
+import { CreditConsumptionPanel, type CreditConsumptionRow } from "../panels/credit-consumption-panel";
 
 const AXIS_TICK = { fontSize: 11, fill: CHART_AXIS };
 const legendStyle = { fontSize: 12, paddingTop: 8 };
 const VIOLET = "#8B5CF6";
+
+function ViewDetailsButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex shrink-0 items-center gap-0.5 text-[12px] font-medium text-primary hover:underline"
+    >
+      View details
+      <ArrowUpRight className="size-3" />
+    </button>
+  );
+}
 
 export function CreditConsumptionSection({
   byMid,
   breakup,
   data,
   merchantNames,
+  detailsRows,
 }: {
   byMid: { name: string; pre: number; post: number }[];
   breakup: { name: string; campaigns: number; loyalty: number; automations: number }[];
   data: Record<string, number | string>[];
   merchantNames: string[];
+  detailsRows: CreditConsumptionRow[];
 }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <ChartCard
         title="Pre vs Post CRM Credits"
         description="Top merchants by CRM credit spend"
         sources={CHART_SOURCES.creditPrePost}
+        action={<ViewDetailsButton onClick={() => setDetailsOpen(true)} />}
         latest
       >
         <div className="h-64 w-full">
@@ -59,6 +80,7 @@ export function CreditConsumptionSection({
         title="Consumption Breakdown"
         description="Top merchants, by category"
         sources={CHART_SOURCES.creditBreakdown}
+        action={<ViewDetailsButton onClick={() => setDetailsOpen(true)} />}
       >
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -116,6 +138,8 @@ export function CreditConsumptionSection({
           </ResponsiveContainer>
         </div>
       </ChartCard>
+
+      <CreditConsumptionPanel rows={detailsRows} open={detailsOpen} onOpenChange={setDetailsOpen} />
     </div>
   );
 }

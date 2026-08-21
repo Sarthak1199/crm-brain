@@ -6,12 +6,16 @@ import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-// Generous but bounded — the slowest single sync leg (credit consumption by
-// week) has measured up to ~4 minutes against production. Without this, a
-// fetch that never resolves (a stalled connection, not just a slow server)
-// left the button spinning forever with no way out, which read as "the sync
-// is broken" even when the underlying job was still fine.
-const TIMEOUT_MS = 5 * 60 * 1000;
+// The interactive sync (/api/admin/sync) no longer runs the slow
+// credit-consumption-by-week step — see that route's comment — so the
+// remaining work (light Redash steps + GSheets) has measured ~170s at its
+// slowest leg. This timeout is set well above that observed ceiling with
+// real margin, not picked arbitrarily: below it and a healthy sync would
+// routinely misreport as "timed out"; much above it and a genuinely hung
+// request goes unreported for too long. Unlike before, hitting this now
+// really does mean something went wrong server-side, not "probably still
+// running" — the tooltip below no longer hedges on that.
+const TIMEOUT_MS = 4 * 60 * 1000;
 
 export function SyncButton() {
   const [state, setState] = useState<"idle" | "syncing" | "done" | "error" | "timeout">("idle");
@@ -65,7 +69,7 @@ export function SyncButton() {
       variant="outline"
       onClick={handleSync}
       disabled={state === "syncing"}
-      title={state === "timeout" ? `No response after ${TIMEOUT_MS / 1000}s — the sync may still be running server-side; check the status dots after a minute.` : undefined}
+      title={state === "timeout" ? `No response after ${TIMEOUT_MS / 1000}s — that's well past this sync's normal ~3 minute ceiling, so something went wrong server-side. Retry, or check the status dots for details.` : undefined}
       className="h-8 gap-1.5 rounded-lg text-[13px]"
     >
       <RefreshCw className={cn("size-3.5", state === "syncing" && "animate-spin")} />

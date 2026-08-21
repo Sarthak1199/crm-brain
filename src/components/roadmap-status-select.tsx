@@ -6,7 +6,15 @@ import { cn } from "@/lib/utils";
 import { KNOWN_ROADMAP_STATUSES, statusToneClass } from "@/lib/roadmap-status";
 import { updateRoadmapStatus } from "@/app/(app)/roadmap/actions";
 
-export function RoadmapStatusSelect({ id, status }: { id: string; status: string }) {
+export function RoadmapStatusSelect({
+  id,
+  status,
+  canEdit = true,
+}: {
+  id: string;
+  status: string;
+  canEdit?: boolean;
+}) {
   const [value, setValue] = useState(status);
   const [isPending, startTransition] = useTransition();
 
@@ -17,6 +25,19 @@ export function RoadmapStatusSelect({ id, status }: { id: string; status: string
     startTransition(async () => {
       await updateRoadmapStatus(id, next);
     });
+  }
+
+  if (!canEdit) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center rounded-full border px-2 py-0.5 text-[12px] font-medium",
+          statusToneClass(value)
+        )}
+      >
+        {value || "Unspecified"}
+      </span>
+    );
   }
 
   return (

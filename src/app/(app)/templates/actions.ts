@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { TemplateChannel, TemplateDealType, TemplateCategory, TemplateHandle, TemplateApprovalStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { requireMutate } from "@/lib/require-mutate";
 
 function parseTemplateFields(formData: FormData) {
   const channel = formData.get("channel");
@@ -41,6 +42,7 @@ function parseTemplateFields(formData: FormData) {
 }
 
 export async function createTemplate(_prevState: string | undefined, formData: FormData): Promise<string | undefined> {
+  await requireMutate();
   const parsed = parseTemplateFields(formData);
   if ("error" in parsed) return parsed.error;
 
@@ -54,6 +56,7 @@ export async function updateTemplate(
   _prevState: string | undefined,
   formData: FormData
 ): Promise<string | undefined> {
+  await requireMutate();
   const parsed = parseTemplateFields(formData);
   if ("error" in parsed) return parsed.error;
 
@@ -66,6 +69,7 @@ export async function updateTemplate(
 }
 
 export async function deleteTemplate(templateId: string): Promise<void> {
+  await requireMutate();
   await prisma.template.delete({ where: { id: templateId } });
   revalidatePath("/templates");
 }
@@ -75,6 +79,7 @@ export async function addTemplateApproval(
   _prevState: string | undefined,
   formData: FormData
 ): Promise<string | undefined> {
+  await requireMutate();
   const approvalStatus = formData.get("approvalStatus");
   const eventId = formData.get("eventId");
   const providerTemplateId = formData.get("providerTemplateId");
@@ -104,6 +109,7 @@ export async function updateTemplateApproval(
   _prevState: string | undefined,
   formData: FormData
 ): Promise<string | undefined> {
+  await requireMutate();
   const approvalStatus = formData.get("approvalStatus");
   const eventId = formData.get("eventId");
   const providerTemplateId = formData.get("providerTemplateId");
@@ -129,6 +135,7 @@ export async function updateTemplateApproval(
 }
 
 export async function deleteTemplateApproval(approvalId: string): Promise<void> {
+  await requireMutate();
   await prisma.templateApproval.delete({ where: { id: approvalId } });
   revalidatePath("/templates");
 }

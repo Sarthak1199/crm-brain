@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ROLE_LABELS, type AppRole } from "@/lib/authz";
 
 function initials(name?: string | null, email?: string | null) {
   const source = name?.trim() || email || "?";
@@ -28,6 +29,12 @@ export async function Topbar() {
 
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <div className="hidden flex-col items-end leading-tight sm:flex">
+              <span className="text-[13px] font-medium text-foreground">{user?.name ?? "User"}</span>
+              <span className="text-[11px] text-muted-foreground">
+                {user?.role && user.role in ROLE_LABELS ? ROLE_LABELS[user.role as AppRole] : user?.role}
+              </span>
+            </div>
             <Avatar className="size-8">
               <AvatarFallback className="bg-accent text-[12px] font-semibold text-accent-foreground">
                 {initials(user?.name, user?.email)}

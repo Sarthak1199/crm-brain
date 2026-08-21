@@ -49,19 +49,27 @@ enum DotpeStatus {
   Inactive
 }
 
+// MANAGER: read + CRUD everywhere except Roadmap (read-only there).
+// USER: read-only everywhere, no CRUD. MEMBER is retired (see migration) —
+// kept out of this list so nothing can write it again, though the
+// underlying Postgres enum still carries the value for existing rows.
 enum UserRole {
   ADMIN
-  MEMBER
+  MANAGER
+  USER
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String?
-  passwordHash String
-  role         UserRole @default(MEMBER)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String   @id @default(cuid())
+  email             String   @unique
+  name              String?
+  passwordHash      String
+  role              UserRole @default(USER)
+  // True for accounts created with a generated temp password — forces a
+  // password change on next login before the rest of the app is reachable.
+  mustResetPassword Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model Merchant {

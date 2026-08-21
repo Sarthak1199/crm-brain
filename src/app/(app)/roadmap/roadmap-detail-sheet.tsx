@@ -19,9 +19,11 @@ import type { SerializedRoadmapItem } from "@/lib/serialize";
 
 export function RoadmapDetailSheet({
   item,
+  canEdit,
   onOpenChange,
 }: {
   item: SerializedRoadmapItem | null;
+  canEdit: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const [editOpen, setEditOpen] = useState(false);
@@ -46,7 +48,7 @@ export function RoadmapDetailSheet({
               <SheetHeader className="border-b border-border pb-4">
                 <div className="flex items-start justify-between gap-2">
                   <SheetTitle className="text-[18px]">{item.title}</SheetTitle>
-                  {item.isManual ? (
+                  {item.isManual && canEdit ? (
                     <div className="mr-6 flex shrink-0 items-center gap-1.5">
                       <Button
                         type="button"
@@ -80,7 +82,7 @@ export function RoadmapDetailSheet({
 
               <div className="px-4">
                 <Section title="Status">
-                  <Field label="Status" value={<RoadmapStatusSelect id={item.id} status={item.status} />} />
+                  <Field label="Status" value={<RoadmapStatusSelect id={item.id} status={item.status} canEdit={canEdit} />} />
                   <Field label="Priority" value={item.priority} />
                   <Field label="USP" value={item.usp ? "Yes" : "No"} />
                   <Field label="Go Live" value={item.goLiveDate} />
@@ -151,7 +153,7 @@ export function RoadmapDetailSheet({
         </SheetContent>
       </Sheet>
 
-      {item?.isManual ? (
+      {item?.isManual && canEdit ? (
         <RoadmapTicketForm
           existing={{
             id: item.id,

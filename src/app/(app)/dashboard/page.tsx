@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { canMutate } from "@/lib/authz";
 import { serializeMerchant, serializeSnapshot, serializeRoadmapItem, serializeSupportRequest } from "@/lib/serialize";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,6 +13,7 @@ import {
   adoptionStats,
   creditBreakupByMid,
   creditBreakupTable,
+  creditConsumptionTable,
   creditsByMid,
   productStatusStages,
   requestTypeStats,
@@ -38,6 +41,8 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
   const selectedIds = (params.mx ?? "").split(",").filter(Boolean);
+  const session = await auth();
+  const canEditRoadmap = canMutate(session?.user?.role, "roadmap");
 
   const where: Prisma.MerchantWhereInput = {};
   if (selectedIds.length > 0) {
@@ -158,6 +163,7 @@ export default async function DashboardPage({
               byMid={creditsByMid(mList)}
               breakup={creditBreakupByMid(mList, snapshotsByMerchant, { from: params.from, to: params.to })}
               {...wowCreditTrend(mList, snapshotsByMerchant, { from: params.from, to: params.to })}
+              detailsRows={creditConsumptionTable(mList, snapshotsByMerchant, { from: params.from, to: params.to })}
             />
             <Suspense fallback={<Skeleton className="h-[352px] w-full rounded-xl" />}>
               <OverallTrendLoader from={params.from} to={params.to} />
@@ -182,6 +188,7 @@ export default async function DashboardPage({
             stages={productStatusStages(roadmapRows)}
             requestStats={requestTypeStats(requestRows)}
             roadmapItems={roadmapRows}
+            canEditRoadmap={canEditRoadmap}
           />
         </section>
       </div>

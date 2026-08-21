@@ -11,6 +11,7 @@ import { getToken } from "next-auth/jwt";
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith("/login");
+  const isResetPasswordRoute = pathname.startsWith("/reset-password");
 
   // Auth.js prefixes the session cookie with "__Secure-" whenever it sets
   // it over HTTPS (production). getToken() defaults secureCookie to false
@@ -32,6 +33,16 @@ export async function proxy(request: NextRequest) {
   }
 
   if (isLoggedIn && isAuthRoute) {
+    return NextResponse.redirect(new URL("/dashboard", request.nextUrl));
+  }
+
+  // Accounts created with a generated temp password carry this flag until
+  // they set their own — block every route but the reset page itself
+  // (and logout) so a temp password can't be used to browse the app.
+  if (isLoggedIn && token?.mustResetPassword && !isResetPasswordRoute) {
+    return NextResponse.redirect(new URL("/reset-password", request.nextUrl));
+  }
+  if (isLoggedIn && !token?.mustResetPassword && isResetPasswordRoute) {
     return NextResponse.redirect(new URL("/dashboard", request.nextUrl));
   }
 }

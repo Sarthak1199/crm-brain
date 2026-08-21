@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { appendRow, resolveSheetTitleByGid } from "@/lib/gsheets";
 import { GSHEET_SOURCES } from "@/lib/sync/gsheet-sources";
 import { normalizeMid } from "@/lib/sync/mid";
+import { canMutate } from "@/lib/authz";
 
 /** Formats a Date as the sheet's own "DD/MM/YYYY HH:mm:ss" IST wall-clock format. */
 function formatTimestampIST(date: Date): string {
@@ -26,6 +27,7 @@ export async function createOnboardingRequest(
   const session = await auth();
   const email = session?.user?.email;
   if (!email) return "Not signed in.";
+  if (!canMutate(session?.user?.role)) return "You don't have permission to make changes here.";
 
   const businessName = formData.get("businessName");
   const enterpriseMerchantId = formData.get("enterpriseMerchantId");

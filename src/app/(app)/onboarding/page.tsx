@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { canMutate } from "@/lib/authz";
 import { PageHeader } from "@/components/page-header";
 import { SyncStatusBar } from "@/components/sync-status-bar";
 import { OnboardingForm } from "./onboarding-form";
@@ -6,6 +8,8 @@ import { OnboardingKpis } from "./onboarding-kpis";
 import { OnboardingDetailsTable } from "./onboarding-details-table";
 
 export default async function OnboardingPage() {
+  const session = await auth();
+  const canEdit = canMutate(session?.user?.role);
   const [requests, merchants, comboMerchants] = await Promise.all([
     prisma.onboardingRequest.findMany({ orderBy: { timestamp: "desc" } }),
     prisma.merchant.findMany({
@@ -74,7 +78,7 @@ export default async function OnboardingPage() {
           title="Onboarding"
           description="Loyalty & CRM license requests — raised here or via the original Google Form."
         />
-        <OnboardingForm merchants={comboMerchants} />
+        {canEdit ? <OnboardingForm merchants={comboMerchants} /> : null}
       </div>
 
       <div className="sticky top-16 z-[5] -mx-6 mb-6 border-b border-border bg-background/95 px-6 py-3 backdrop-blur md:-mx-8 md:px-8">

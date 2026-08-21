@@ -5,6 +5,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { requireMutate } from "@/lib/require-mutate";
 
 const MAX_FILES = 6;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -149,6 +150,7 @@ export async function createSupportRequest(
   _prevState: string | undefined,
   formData: FormData
 ): Promise<string | undefined> {
+  await requireMutate();
   const parsed = parseMultiDescriptionFields(formData);
   if ("error" in parsed) return parsed.error;
   const { shared, descriptions } = parsed.data;
@@ -176,6 +178,7 @@ export async function updateSupportRequest(
   _prevState: string | undefined,
   formData: FormData
 ): Promise<string | undefined> {
+  await requireMutate();
   const parsed = parseCommonFields(formData);
   if ("error" in parsed) return parsed.error;
 
@@ -198,6 +201,7 @@ export async function updateSupportRequest(
 }
 
 export async function deleteSupportRequest(requestId: string): Promise<void> {
+  await requireMutate();
   const dir = path.join(process.cwd(), "public", "uploads", "requests", requestId);
   await prisma.supportRequest.delete({ where: { id: requestId } });
   await rm(dir, { recursive: true, force: true });

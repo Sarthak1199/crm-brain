@@ -21,10 +21,12 @@ type MerchantOption = { id: string; brandName: string; totalStores: number; tota
 export function RequestDetailSheet({
   row,
   merchants,
+  canEdit,
   onOpenChange,
 }: {
   row: RequestRow | null;
   merchants: MerchantOption[];
+  canEdit: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const [editOpen, setEditOpen] = useState(false);
@@ -59,29 +61,31 @@ export function RequestDetailSheet({
                       {row.type}
                     </span>
                   </div>
-                  <div className="mr-6 flex items-center gap-1.5">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 gap-1 rounded-md text-[12px]"
-                      onClick={() => setEditOpen(true)}
-                    >
-                      <Pencil className="size-3" />
-                      Edit
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={isDeleting}
-                      className="h-7 gap-1 rounded-md text-[12px] text-negative-foreground hover:bg-negative/10"
-                      onClick={handleDelete}
-                    >
-                      <Trash2 className="size-3" />
-                      {isDeleting ? "Deleting..." : "Delete"}
-                    </Button>
-                  </div>
+                  {canEdit ? (
+                    <div className="mr-6 flex items-center gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1 rounded-md text-[12px]"
+                        onClick={() => setEditOpen(true)}
+                      >
+                        <Pencil className="size-3" />
+                        Edit
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isDeleting}
+                        className="h-7 gap-1 rounded-md text-[12px] text-negative-foreground hover:bg-negative/10"
+                        onClick={handleDelete}
+                      >
+                        <Trash2 className="size-3" />
+                        {isDeleting ? "Deleting..." : "Delete"}
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
                 <SheetDescription>
                   {row.merchant.dotpeMid} · Filed {formatDate(row.createdAt)}

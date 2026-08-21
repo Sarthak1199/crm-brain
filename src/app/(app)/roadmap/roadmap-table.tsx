@@ -25,7 +25,7 @@ const ACCESSORS = {
   goLiveDate: (r: SerializedRoadmapItem) => r.goLiveDate,
 };
 
-export function RoadmapTable({ rows }: { rows: SerializedRoadmapItem[] }) {
+export function RoadmapTable({ rows, canEdit }: { rows: SerializedRoadmapItem[]; canEdit: boolean }) {
   const [selected, setSelected] = useState<SerializedRoadmapItem | null>(null);
   const { sorted, sortKey, direction, toggleSort } = useSort(rows, ACCESSORS);
 
@@ -61,7 +61,7 @@ export function RoadmapTable({ rows }: { rows: SerializedRoadmapItem[] }) {
                   </TableCell>
                   <TableCell className="px-4 py-3.5 text-[13px] text-muted-foreground">{item.theme ?? "—"}</TableCell>
                   <TableCell className="px-4 py-3.5">
-                    <RoadmapStatusSelect id={item.id} status={item.status} />
+                    <RoadmapStatusSelect id={item.id} status={item.status} canEdit={canEdit} />
                   </TableCell>
                   <TableCell className="px-4 py-3.5 text-[13px] text-foreground">{item.design ?? "—"}</TableCell>
                   <TableCell className="px-4 py-3.5">
@@ -93,7 +93,7 @@ export function RoadmapTable({ rows }: { rows: SerializedRoadmapItem[] }) {
         </TableBody>
       </Table>
 
-      <RoadmapDetailSheet item={selected} onOpenChange={(open) => !open && setSelected(null)} />
+      <RoadmapDetailSheet item={selected} canEdit={canEdit} onOpenChange={(open) => !open && setSelected(null)} />
     </div>
   );
 }

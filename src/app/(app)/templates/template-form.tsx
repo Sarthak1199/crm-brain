@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { TEMPLATE_VARIABLES } from "@/lib/template-variables";
+import { variablesForCategory } from "@/lib/template-variables";
 
 export type Channel = "SMS" | "WhatsApp";
 export type DealType = "WithDeal" | "WithoutDeal";
@@ -55,13 +55,18 @@ export function TemplateForm({
   const open = controlledOpen ?? internalOpen;
   const setOpen = setControlledOpen ?? setInternalOpen;
 
-  const [channel, setChannel] = useState<Channel | "">(existing?.channel ?? "");
-  const [dealType, setDealType] = useState<DealType | "">(existing?.dealType ?? "");
-  const [category, setCategory] = useState<Category | "">(existing?.category ?? "");
-  const [handle, setHandle] = useState<Handle | "">(existing?.handle ?? "");
+  // New templates default to the most common combination (WhatsApp, With
+  // Deal, Merchant handle, Loyalty category) so most submissions only need
+  // the message text changed — editing an existing template always starts
+  // from its actual saved values instead.
+  const [channel, setChannel] = useState<Channel | "">(existing?.channel ?? "WhatsApp");
+  const [dealType, setDealType] = useState<DealType | "">(existing?.dealType ?? "WithDeal");
+  const [category, setCategory] = useState<Category | "">(existing?.category ?? "Loyalty");
+  const [handle, setHandle] = useState<Handle | "">(existing?.handle ?? "Merchant");
   const [requestedMid, setRequestedMid] = useState(existing?.requestedMid ?? "");
   const [messageText, setMessageText] = useState(existing?.messageText ?? "");
   const messageTextRef = useRef<HTMLTextAreaElement>(null);
+  const variables = variablesForCategory(category);
 
   const action = isEdit ? updateTemplate.bind(null, existing.id) : createTemplate;
   const [error, formAction, isPending] = useActionState(action, undefined);
@@ -69,10 +74,10 @@ export function TemplateForm({
 
   function resetForm() {
     if (!isEdit) {
-      setChannel("");
-      setDealType("");
-      setCategory("");
-      setHandle("");
+      setChannel("WhatsApp");
+      setDealType("WithDeal");
+      setCategory("Loyalty");
+      setHandle("Merchant");
       setRequestedMid("");
       setMessageText("");
     }
@@ -199,21 +204,23 @@ export function TemplateForm({
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-[13px] font-medium text-foreground">Insert variable</Label>
-          <div className="flex flex-wrap gap-1.5">
-            {TEMPLATE_VARIABLES.map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => insertVariable(v)}
-                className="rounded-full border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                {v}
-              </button>
-            ))}
+        {variables.length > 0 ? (
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-[13px] font-medium text-foreground">Insert variable</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {variables.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => insertVariable(v)}
+                  className="rounded-full border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="messageText" className="text-[13px] font-medium text-foreground">

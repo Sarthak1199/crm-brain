@@ -36,6 +36,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           name: user.name,
           role: user.role,
+          mustResetPassword: user.mustResetPassword,
         };
       },
     }),
@@ -43,14 +44,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = (user as { role?: string }).role ?? "MEMBER";
+        token.role = (user as { role?: string }).role ?? "USER";
+        token.mustResetPassword = (user as { mustResetPassword?: boolean }).mustResetPassword ?? false;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub as string;
-        session.user.role = (token.role as string) ?? "MEMBER";
+        session.user.role = (token.role as string) ?? "USER";
+        session.user.mustResetPassword = (token.mustResetPassword as boolean) ?? false;
       }
       return session;
     },

@@ -1,6 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import { MessageSquareText, CheckCircle2, LayoutList } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { canMutate } from "@/lib/authz";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { formatNumber } from "@/lib/format";
@@ -17,6 +19,8 @@ export default async function TemplatesPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
+  const session = await auth();
+  const canEdit = canMutate(session?.user?.role);
 
   const where: Prisma.TemplateWhereInput = {};
   if (params.channel === "SMS" || params.channel === "WhatsApp") {
@@ -67,7 +71,7 @@ export default async function TemplatesPage({
           title="Message Templates"
           description="SMS and WhatsApp templates, with approval submissions once live on the provider."
         />
-        <TemplateForm />
+        {canEdit ? <TemplateForm /> : null}
       </div>
 
       <div className="mb-5">
@@ -84,7 +88,7 @@ export default async function TemplatesPage({
         />
       </div>
 
-      <TemplatesTable rows={rows} />
+      <TemplatesTable rows={rows} canEdit={canEdit} />
     </div>
   );
 }

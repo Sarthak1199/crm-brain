@@ -5,8 +5,10 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { requireMutate } from "@/lib/require-mutate";
 
 export async function updateRoadmapStatus(id: string, status: string) {
+  await requireMutate("roadmap");
   // The sheet's own status values aren't a closed set (the UI deliberately
   // lets an item's current, not-yet-catalogued value stay selectable), so
   // this isn't a strict allowlist — just a sanity bound against garbage.
@@ -83,6 +85,7 @@ function parseTicketFields(formData: FormData) {
 }
 
 export async function createRoadmapTicket(_prevState: string | undefined, formData: FormData): Promise<string | undefined> {
+  await requireMutate("roadmap");
   const parsed = parseTicketFields(formData);
   if ("error" in parsed) return parsed.error;
 
@@ -103,6 +106,7 @@ export async function updateRoadmapTicket(
   _prevState: string | undefined,
   formData: FormData
 ): Promise<string | undefined> {
+  await requireMutate("roadmap");
   const parsed = parseTicketFields(formData);
   if ("error" in parsed) return parsed.error;
 
@@ -122,6 +126,7 @@ export async function updateRoadmapTicket(
 }
 
 export async function deleteRoadmapTicket(ticketId: string): Promise<void> {
+  await requireMutate("roadmap");
   const dir = path.join(process.cwd(), "public", "uploads", "roadmap", ticketId);
   await prisma.roadmapItem.delete({ where: { id: ticketId } });
   await rm(dir, { recursive: true, force: true });

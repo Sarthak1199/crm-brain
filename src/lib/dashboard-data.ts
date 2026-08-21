@@ -187,6 +187,50 @@ export function creditBreakupTable(
     .sort((a, b) => b.total - a.total);
 }
 
+// "Pre vs Post CRM Credits" + "Consumption Breakdown" → View Details table:
+// every merchant's pre/post CRM credit totals (lifetime, same source as the
+// Pre vs Post chart) alongside the same per-category breakdown as
+// creditBreakupTable, so the one table answers both cards' "who and how
+// much" questions together.
+export function creditConsumptionTable(
+  merchants: SerializedMerchant[],
+  snapshotsByMerchant: Record<string, SerializedSnapshot[]>,
+  dateRange: { from?: string; to?: string } = {}
+) {
+  function sumField(merchantId: string, fieldName: string) {
+    const snaps = snapshotsByMerchant[merchantId] ?? [];
+    return snaps
+      .filter((s) => s.fieldName === fieldName)
+      .filter((s) => {
+        const weekKey = new Date(s.capturedAt).toISOString().slice(0, 10);
+        if (dateRange.from && weekKey < dateRange.from) return false;
+        if (dateRange.to && weekKey > dateRange.to) return false;
+        return true;
+      })
+      .reduce((a, s) => a + s.value, 0);
+  }
+
+  return merchants
+    .map((m) => {
+      const campaigns = sumField(m.id, "creditConsumption.campaigns");
+      const loyalty = sumField(m.id, "creditConsumption.loyalty");
+      const automations = sumField(m.id, "creditConsumption.automations");
+      return {
+        id: m.id,
+        brandName: m.brandName,
+        dotpeMid: m.dotpeMid,
+        totalStores: m.totalStores,
+        preCrmCredits: m.preCrmCredits,
+        postCrmCredits: m.postCrmCredits,
+        campaigns,
+        loyalty,
+        automations,
+        total: campaigns + loyalty + automations,
+      };
+    })
+    .sort((a, b) => b.total - a.total);
+}
+
 export function wowCreditTrend(
   merchants: SerializedMerchant[],
   snapshotsByMerchant: Record<string, SerializedSnapshot[]>,

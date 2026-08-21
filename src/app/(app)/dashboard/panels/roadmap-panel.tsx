@@ -30,10 +30,12 @@ const ACCESSORS = {
 
 export function RoadmapPanel({
   items,
+  canEdit,
   open,
   onOpenChange,
 }: {
   items: SerializedRoadmapItem[];
+  canEdit: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -98,7 +100,7 @@ export function RoadmapPanel({
                         </TableCell>
                         <TableCell className="px-4 py-3 text-[13px] text-muted-foreground">{item.theme ?? "—"}</TableCell>
                         <TableCell className="px-4 py-3">
-                          <RoadmapStatusSelect id={item.id} status={item.status} />
+                          <RoadmapStatusSelect id={item.id} status={item.status} canEdit={canEdit} />
                         </TableCell>
                         <TableCell className="px-4 py-3">
                           {ticket ? (

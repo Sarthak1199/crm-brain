@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/copy-button";
 import { Section } from "@/components/detail-panel";
 import { formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { deleteTemplate, deleteTemplateApproval } from "./actions";
 import { TemplateForm, HANDLE_LABELS } from "./template-form";
 import { ApprovalForm } from "./approval-form";
@@ -36,9 +37,11 @@ function ApprovalStatusBadge({ status }: { status: "Submitted" | "Approved" }) {
 
 export function TemplateDetailSheet({
   row,
+  canEdit,
   onOpenChange,
 }: {
   row: TemplateRow | null;
+  canEdit: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const [editOpen, setEditOpen] = useState(false);
@@ -88,29 +91,31 @@ export function TemplateDetailSheet({
                       </Badge>
                     ) : null}
                   </div>
-                  <div className="mr-6 flex items-center gap-1.5">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 gap-1 rounded-md text-[12px]"
-                      onClick={() => setEditOpen(true)}
-                    >
-                      <Pencil className="size-3" />
-                      Edit
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={isDeleting}
-                      className="h-7 gap-1 rounded-md text-[12px] text-negative-foreground hover:bg-negative/10"
-                      onClick={handleDelete}
-                    >
-                      <Trash2 className="size-3" />
-                      {isDeleting ? "Deleting..." : "Delete"}
-                    </Button>
-                  </div>
+                  {canEdit ? (
+                    <div className="mr-6 flex items-center gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1 rounded-md text-[12px]"
+                        onClick={() => setEditOpen(true)}
+                      >
+                        <Pencil className="size-3" />
+                        Edit
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isDeleting}
+                        className="h-7 gap-1 rounded-md text-[12px] text-negative-foreground hover:bg-negative/10"
+                        onClick={handleDelete}
+                      >
+                        <Trash2 className="size-3" />
+                        {isDeleting ? "Deleting..." : "Delete"}
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
                 <SheetDescription>
                   Created {formatDate(row.createdAt)}
@@ -144,8 +149,11 @@ export function TemplateDetailSheet({
                         ) : (
                           <div
                             key={a.id}
-                            className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 hover:bg-muted/40"
-                            onClick={() => setEditingApprovalId(a.id)}
+                            className={cn(
+                              "flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2",
+                              canEdit && "cursor-pointer hover:bg-muted/40"
+                            )}
+                            onClick={canEdit ? () => setEditingApprovalId(a.id) : undefined}
                           >
                             <div className="flex min-w-0 items-center gap-2">
                               <ApprovalStatusBadge status={a.approvalStatus} />
@@ -155,17 +163,19 @@ export function TemplateDetailSheet({
                                   .join(" · ") || "No IDs recorded yet"}
                               </p>
                             </div>
-                            <button
-                              type="button"
-                              disabled={deletingApprovalId === a.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteApproval(a.id);
-                              }}
-                              className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-negative/10 hover:text-negative-foreground"
-                            >
-                              <X className="size-3.5" />
-                            </button>
+                            {canEdit ? (
+                              <button
+                                type="button"
+                                disabled={deletingApprovalId === a.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteApproval(a.id);
+                                }}
+                                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-negative/10 hover:text-negative-foreground"
+                              >
+                                <X className="size-3.5" />
+                              </button>
+                            ) : null}
                           </div>
                         )
                       )}
@@ -174,7 +184,7 @@ export function TemplateDetailSheet({
                     <p className="mb-3 text-[13px] text-muted-foreground">No approval submissions yet.</p>
                   )}
 
-                  <ApprovalForm templateId={row.id} />
+                  {canEdit ? <ApprovalForm templateId={row.id} /> : null}
                 </div>
               </div>
             </>

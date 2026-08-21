@@ -2,19 +2,29 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { isRedashConfigured } from "@/lib/redash";
 import { isGsheetsConfigured } from "@/lib/gsheets";
-import { syncRedashLight, syncRedashCreditWeekly } from "@/lib/sync/sync-redash";
+import { syncRedashLight } from "@/lib/sync/sync-redash";
 import { syncGsheets } from "@/lib/sync/sync-gsheets";
 
-// Runs all three syncs concurrently rather than sequentially, and splits
-// Redash into its light/heavy halves the same way the daily cron does (see
-// sync-redash.ts) — confirmed empirically against production that this
-// account's Vercel plan enforces roughly a 300s gateway timeout regardless
-// of this route's `maxDuration` value (tested up to 800, no change in the
-// actual cutoff), and the full 7-step Redash sync alone measured 5:25-6:54.
-// Running the light steps, the one slow step, and GSheets concurrently
-// bounds the wall-clock cost to whichever is slowest (~220s for the slow
-// step) instead of stacking everything under one shared budget.
-export const maxDuration = 300;
+// Deliberately does NOT run syncRedashCreditWeekly here — diagnosed via
+// production SyncRun history (Aug 20-21) that this was the actual cause of
+// "Sync now" hanging forever: every recent manual sync left two orphaned
+// REDASH SyncRun rows (light steps + credit-weekly, run concurrently below)
+// with no finishedAt, while the concurrent GSheets leg reliably completed
+// in ~170s. The credit-weekly step fetches 14 Redash queries in parallel,
+// each independently slow server-side (previously measured ~60s apiece,
+// now well past that as merchant count and synced history have grown) —
+// it's the one piece of work that pushes past whatever ceiling Vercel
+// actually enforces (empirically ~300s in earlier testing, regardless of
+// this route's own `maxDuration`), and when the platform kills the
+// function mid-flight, the SyncRun row created at the start of
+// withSyncRun never reaches the code that sets finishedAt — a genuine,
+// silent server-side kill, not a client illusion.
+//
+// That data doesn't need to be interactive: it's already kept fresh by its
+// own daily cron (sync-redash-credit-weekly, see vercel.json), independent
+// of this button. Keeping it out of the click path is what makes "Sync
+// now" actually finish and report a real result instead of hanging.
+export const maxDuration = 240;
 
 export async function POST() {
   const session = await auth();
@@ -25,12 +35,9 @@ export async function POST() {
   const results: Record<string, unknown> = {};
   const errors: Record<string, string> = {};
 
-  const [redashLight, redashCreditWeekly, gsheets] = await Promise.allSettled([
+  const [redashLight, gsheets] = await Promise.allSettled([
     isRedashConfigured()
       ? syncRedashLight()
-      : Promise.reject(new Error("Not configured (REDASH_BASE_URL / REDASH_API_KEY)")),
-    isRedashConfigured()
-      ? syncRedashCreditWeekly()
       : Promise.reject(new Error("Not configured (REDASH_BASE_URL / REDASH_API_KEY)")),
     isGsheetsConfigured()
       ? syncGsheets()
@@ -40,13 +47,13 @@ export async function POST() {
   if (redashLight.status === "fulfilled") results.redashLight = redashLight.value;
   else errors.redashLight = redashLight.reason instanceof Error ? redashLight.reason.message : "Unknown error";
 
-  if (redashCreditWeekly.status === "fulfilled") results.redashCreditWeekly = redashCreditWeekly.value;
-  else
-    errors.redashCreditWeekly =
-      redashCreditWeekly.reason instanceof Error ? redashCreditWeekly.reason.message : "Unknown error";
-
   if (gsheets.status === "fulfilled") results.gsheets = gsheets.value;
   else errors.gsheets = gsheets.reason instanceof Error ? gsheets.reason.message : "Unknown error";
 
-  return NextResponse.json({ ok: Object.keys(errors).length === 0, results, errors });
+  return NextResponse.json({
+    ok: Object.keys(errors).length === 0,
+    results,
+    errors,
+    note: "Credit-consumption-by-week data isn't refreshed by this button — it syncs nightly on its own schedule.",
+  });
 }
