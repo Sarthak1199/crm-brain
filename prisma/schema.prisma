@@ -96,8 +96,12 @@ model Merchant {
   totalStores         Int @default(0)
   activeDineInStores  Int @default(0)
   loyaltyActiveStores Int @default(0)
-  paidBranches        Int @default(0)
-  closedBranches      Int @default(0)
+  // Source: the closures sheet's "Pending outlet closure" column — branches
+  // not yet closed. Previously misnamed `paidBranches`, which every reader
+  // (including at least one UI label) took to mean the opposite of what it
+  // actually held.
+  pendingBranches Int @default(0)
+  closedBranches  Int @default(0)
 
   // Commercials
   paymentCollectedDate DateTime?

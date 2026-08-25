@@ -55,7 +55,7 @@ export function MerchantDetailSheet({
                 <Field label="Total Stores" value={formatNumber(m.totalStores)} />
                 <Field label="Active Dine-in Stores" value={formatNumber(m.activeDineInStores)} />
                 <Field label="Loyalty Active Stores" value={formatNumber(m.loyaltyActiveStores)} />
-                <Field label="Paid Branches" value={formatNumber(m.paidBranches)} />
+                <Field label="Pending Branches" value={formatNumber(m.pendingBranches)} />
                 <Field label="Closed Branches" value={formatNumber(m.closedBranches)} />
               </Section>
 

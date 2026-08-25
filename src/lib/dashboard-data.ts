@@ -14,8 +14,14 @@ function hasDemo(m: SerializedMerchant) {
 // Deliberately not crmStatus (Redash) — the funnel's Paid count must reflect
 // only ops-confirmed closures from the CRM Sales "CRM+Loyalty closures" tab,
 // which is a narrower, ground-truth set than everything Redash calls "A".
+// Also deliberately not crmActivationConfirmed: that tracks CRM system
+// activation, a separate later step from the sale itself closing (same
+// reasoning salesStatus() below already uses for its own INR figure) — a
+// merchant with closed outlets on this sheet is a paid customer whether or
+// not CRM access has been switched on yet, and gating on activation here
+// undercounted the funnel's own later "CRM activated" stage into "Paid".
 function isPaid(m: SerializedMerchant) {
-  return m.crmActivationConfirmed === true;
+  return m.closedBranches > 0;
 }
 function hasLoyaltyActive(m: SerializedMerchant) {
   return m.loyaltyStatus === "Active";
@@ -52,13 +58,13 @@ export function activationFunnelByBranches(
   return [
     { stage: "Target", count: sum(merchants.filter(isTargeted), "totalStores") },
     { stage: "Demo", count: sum(merchants.filter(hasDemo), "totalStores") },
-    { stage: "Paid", count: sum(merchants.filter(isPaid), "paidBranches") },
-    { stage: "Loyalty active", count: sum(merchants.filter(hasLoyaltyActive), "paidBranches") },
-    { stage: "Campaigns active", count: sum(merchants.filter(hasCampaignsActive), "paidBranches") },
-    { stage: "Automations active", count: sum(merchants.filter(hasAutomationsActive), "paidBranches") },
+    { stage: "Paid", count: sum(merchants.filter(isPaid), "closedBranches") },
+    { stage: "Loyalty active", count: sum(merchants.filter(hasLoyaltyActive), "closedBranches") },
+    { stage: "Campaigns active", count: sum(merchants.filter(hasCampaignsActive), "closedBranches") },
+    { stage: "Automations active", count: sum(merchants.filter(hasAutomationsActive), "closedBranches") },
     {
       stage: "CRM activated",
-      count: sum(merchants.filter((m) => crmActivatedIds.has(m.id)), "paidBranches"),
+      count: sum(merchants.filter((m) => crmActivatedIds.has(m.id)), "closedBranches"),
     },
   ];
 }
@@ -72,11 +78,11 @@ export function salesStatus(merchants: SerializedMerchant[]) {
   const closedInr = merchants.reduce((a, m) => a + m.paymentCollected, 0);
   const pendingInr = Math.max(totalPotentialInr - closedInr, 0);
 
-  // Sourced directly from the GSheet, not computed: paidBranches is the
+  // Sourced directly from the GSheet, not computed: pendingBranches is the
   // "pending outlet closure" column (outlets still open) and closedBranches
   // is the "outlet closed" column — both per-merchant counts maintained by
   // ops, not derived from activeDineInStores (which has no data source).
-  const pendingBranches = merchants.reduce((a, m) => a + m.paidBranches, 0);
+  const pendingBranches = merchants.reduce((a, m) => a + m.pendingBranches, 0);
   const closedBranches = merchants.reduce((a, m) => a + m.closedBranches, 0);
 
   return {

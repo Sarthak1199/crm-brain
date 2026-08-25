@@ -104,7 +104,7 @@ export async function syncCrmLoyaltyClosuresSheet() {
     paymentSum: number;
     hasPayment: boolean;
     totalStores?: number;
-    paidBranches?: number;
+    pendingBranches?: number;
     closedBranches?: number;
     totalYearlyPotential?: number;
     loyaltyStatus?: "Active" | "Inactive";
@@ -123,12 +123,15 @@ export async function syncCrmLoyaltyClosuresSheet() {
     const ristaBrandId = pick(row, "rista acc number");
     const paymentCollected = parseAmount(pick(row, "payment collected"));
     const totalStores = parseInt_(pick(row, "total no. of outlets"));
-    const paidBranches = parseInt_(pick(row, "pending outlet closure"));
+    const pendingBranches = parseInt_(pick(row, "pending outlet closure"));
     const closedBranches = parseInt_(pick(row, "outlet closed"));
     const totalYearlyPotential = parseAmount(pick(row, "total potential closure yearly"));
     const loyaltyStatus = parseYesNo(pick(row, "loyalty activation status"));
     // Explicit boolean, not optional: absence/"No" in this sheet must be able
-    // to revoke a previously-confirmed Paid count, not just leave it alone.
+    // to revoke a previously-confirmed value, not just leave it alone. This
+    // tracks CRM system activation specifically — a separate, later event
+    // from a sale closing — see isPaid() in dashboard-data.ts, which uses
+    // closedBranches > 0 (the "Outlet closed" column) instead.
     const crmActivationConfirmed = (pick(row, "crm activation status") ?? "").trim().toLowerCase() === "yes";
 
     const existingGroup = groups.get(dotpeMid);
@@ -138,7 +141,7 @@ export async function syncCrmLoyaltyClosuresSheet() {
       paymentSum: (existingGroup?.paymentSum ?? 0) + (paymentCollected ?? 0),
       hasPayment: (existingGroup?.hasPayment ?? false) || paymentCollected !== undefined,
       totalStores: totalStores ?? existingGroup?.totalStores,
-      paidBranches: paidBranches ?? existingGroup?.paidBranches,
+      pendingBranches: pendingBranches ?? existingGroup?.pendingBranches,
       closedBranches: closedBranches ?? existingGroup?.closedBranches,
       totalYearlyPotential: totalYearlyPotential ?? existingGroup?.totalYearlyPotential,
       loyaltyStatus: loyaltyStatus ?? existingGroup?.loyaltyStatus,
@@ -162,7 +165,7 @@ export async function syncCrmLoyaltyClosuresSheet() {
       ...(g.brandName ? { brandName: g.brandName } : {}),
       ...(g.hasPayment ? { paymentCollected: g.paymentSum, subscriptionRevenue: g.paymentSum } : {}),
       ...(g.totalStores !== undefined ? { totalStores: g.totalStores } : {}),
-      ...(g.paidBranches !== undefined ? { paidBranches: g.paidBranches } : {}),
+      ...(g.pendingBranches !== undefined ? { pendingBranches: g.pendingBranches } : {}),
       ...(g.closedBranches !== undefined ? { closedBranches: g.closedBranches } : {}),
       ...(g.totalYearlyPotential !== undefined ? { totalYearlyPotential: g.totalYearlyPotential } : {}),
       ...(g.loyaltyStatus ? { loyaltyStatus: g.loyaltyStatus } : {}),

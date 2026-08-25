@@ -13,7 +13,7 @@ import type { SerializedMerchant } from "@/lib/serialize";
 import { PaymentsPanel } from "../panels/payments-panel";
 
 type SalesStatus = ReturnType<typeof salesStatus>;
-type PaymentsRow = Pick<SerializedMerchant, "id" | "brandName" | "dotpeMid" | "paymentCollected" | "paymentCollectedDate" | "paidBranches">;
+type PaymentsRow = Pick<SerializedMerchant, "id" | "brandName" | "dotpeMid" | "paymentCollected" | "paymentCollectedDate" | "closedBranches">;
 
 function DonutChart({
   pending,

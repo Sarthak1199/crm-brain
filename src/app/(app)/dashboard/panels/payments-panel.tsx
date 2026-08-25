@@ -16,14 +16,14 @@ import { useSort } from "@/hooks/use-sort";
 import { formatInr, formatNumber, formatDate } from "@/lib/format";
 import type { SerializedMerchant } from "@/lib/serialize";
 
-type Row = Pick<SerializedMerchant, "id" | "brandName" | "dotpeMid" | "paymentCollected" | "paymentCollectedDate" | "paidBranches">;
+type Row = Pick<SerializedMerchant, "id" | "brandName" | "dotpeMid" | "paymentCollected" | "paymentCollectedDate" | "closedBranches">;
 
 const ACCESSORS = {
   brandName: (r: Row) => r.brandName,
   dotpeMid: (r: Row) => r.dotpeMid,
   paymentCollected: (r: Row) => r.paymentCollected,
   paymentCollectedDate: (r: Row) => (r.paymentCollectedDate ? new Date(r.paymentCollectedDate) : null),
-  paidBranches: (r: Row) => r.paidBranches,
+  closedBranches: (r: Row) => r.closedBranches,
 };
 
 export function PaymentsPanel({
@@ -74,7 +74,7 @@ export function PaymentsPanel({
                   <SortableHead label="MID" sortKey="dotpeMid" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableHead label="Payment Collected" sortKey="paymentCollected" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
                   <SortableHead label="Collected Date" sortKey="paymentCollectedDate" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
-                  <SortableHead label="Paid Branches" sortKey="paidBranches" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+                  <SortableHead label="Paid Branches" sortKey="closedBranches" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -96,7 +96,7 @@ export function PaymentsPanel({
                         {formatDate(m.paymentCollectedDate)}
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right text-[13px] text-foreground">
-                        {formatNumber(m.paidBranches)}
+                        {formatNumber(m.closedBranches)}
                       </TableCell>
                     </TableRow>
                   ))
