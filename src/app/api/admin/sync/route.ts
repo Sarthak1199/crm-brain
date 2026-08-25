@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { canMutate } from "@/lib/authz";
 import { isRedashConfigured } from "@/lib/redash";
 import { isGsheetsConfigured } from "@/lib/gsheets";
 import { syncRedashLight } from "@/lib/sync/sync-redash";
@@ -28,7 +29,7 @@ export const maxDuration = 240;
 
 export async function POST() {
   const session = await auth();
-  if (!session?.user || session.user.role !== "ADMIN") {
+  if (!canMutate(session?.user?.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

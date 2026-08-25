@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ROLE_LABELS, type AppRole } from "@/lib/authz";
+import { canMutate, ROLE_LABELS, type AppRole } from "@/lib/authz";
 
 function initials(name?: string | null, email?: string | null) {
   const source = name?.trim() || email || "?";
@@ -20,12 +20,14 @@ function initials(name?: string | null, email?: string | null) {
 export async function Topbar() {
   const session = await auth();
   const user = session?.user;
-  const isAdmin = user?.role === "ADMIN";
+  // Sync now is a write-ish, platform-wide action — same bar as every
+  // other mutation (Admin + Manager, not plain User), not Admin-only.
+  const canSync = canMutate(user?.role);
 
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center justify-end border-b border-border bg-background/95 px-6 backdrop-blur">
       <div className="flex items-center gap-3">
-        {isAdmin ? <SyncButton /> : null}
+        {canSync ? <SyncButton /> : null}
 
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
