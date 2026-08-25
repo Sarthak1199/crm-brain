@@ -35,15 +35,15 @@ export async function syncCrmActiveSheet() {
   const title = await resolveSheetTitleByGid(source.spreadsheetId, source.gid);
   const rows = await readSheetAsObjects(source.spreadsheetId, title, source.headerRow);
 
-  let matched = 0;
-  let skipped = 0;
-
-  for (const row of rows) {
+  // Same fix as syncCrmGtmDemoSheet below: independent per-merchant writes
+  // run with bounded concurrency instead of one at a time — with the sheet
+  // grown to its current row count, the old sequential version was slow
+  // enough to be a real contributor to syncGsheets() as a whole timing out
+  // and never finishing (see syncCrmLoyaltyClosuresSheet for the other half
+  // of that same bug, and its effect on stale "Total Collected" figures).
+  const outcomes = await mapWithConcurrency(rows, 15, async (row) => {
     const dotpeMid = normalizeMid(pick(row, "merchant_id"));
-    if (!dotpeMid) {
-      skipped++;
-      continue;
-    }
+    if (!dotpeMid) return { matched: 0, skipped: 1 };
 
     const pocName = pick(row, "poc name");
     const pocNumber = pick(row, "phone number");
@@ -60,10 +60,18 @@ export async function syncCrmActiveSheet() {
           ...(postCrmCredits !== undefined ? { postCrmCredits } : {}),
         },
       });
-      matched += result.count;
+      return { matched: result.count, skipped: 0 };
     } catch (error) {
       console.error(`syncCrmActiveSheet: skipped MID ${dotpeMid}`, error);
+      return { matched: 0, skipped: 0 };
     }
+  });
+
+  let matched = 0;
+  let skipped = 0;
+  for (const o of outcomes) {
+    matched += o.matched;
+    skipped += o.skipped;
   }
 
   return { matched, skipped };
@@ -140,7 +148,15 @@ export async function syncCrmLoyaltyClosuresSheet() {
     });
   }
 
-  for (const [dotpeMid, g] of groups) {
+  // This is the sheet that feeds "Total Collected (INR)" (paymentCollected /
+  // subscriptionRevenue) — one serial DB round-trip per grouped merchant was
+  // slow enough, at current sheet size, that the sync could die partway
+  // through the Map's iteration order before reaching every group. Whichever
+  // merchants came later never got their latest payment written, silently
+  // under-reporting the platform-wide total. Bounded concurrency (each
+  // group is a distinct merchant, so no write races) fixes both the
+  // under-count and the timeout it was a symptom of.
+  const outcomes = await mapWithConcurrency(Array.from(groups), 15, async ([dotpeMid, g]) => {
     const updateData = {
       ...(g.ristaBrandId ? { ristaBrandId: g.ristaBrandId } : {}),
       ...(g.brandName ? { brandName: g.brandName } : {}),
@@ -157,20 +173,25 @@ export async function syncCrmLoyaltyClosuresSheet() {
       const existing = await prisma.merchant.findUnique({ where: { dotpeMid }, select: { id: true } });
       if (existing) {
         await prisma.merchant.update({ where: { dotpeMid }, data: updateData });
-        matched++;
+        return { matched: 1, created: 0, skipped: 0 };
       } else if (g.brandName) {
         // This sheet is sometimes the FIRST place a new closure shows up,
         // ahead of the next Redash sync — create rather than silently drop
         // the row so its payment/branch figures aren't lost.
         await prisma.merchant.create({ data: { dotpeMid, brandName: g.brandName, ...updateData } });
-        created++;
-      } else {
-        skipped++;
+        return { matched: 0, created: 1, skipped: 0 };
       }
+      return { matched: 0, created: 0, skipped: 1 };
     } catch (error) {
       console.error(`syncCrmLoyaltyClosuresSheet: skipped MID ${dotpeMid}`, error);
-      skipped++;
+      return { matched: 0, created: 0, skipped: 1 };
     }
+  });
+
+  for (const o of outcomes) {
+    matched += o.matched;
+    created += o.created;
+    skipped += o.skipped;
   }
 
   return { matched, created, skipped };

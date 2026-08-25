@@ -46,9 +46,15 @@ function mapCrmLicenseStatus(code: string): "Active" | "Paused" | "Expired" | "N
  */
 export async function syncCrmAdoption() {
   const rows = await fetchCrmAdoption();
-  let count = 0;
 
-  for (const row of rows) {
+  // One row at a time here meant a full sequential DB round-trip per
+  // merchant — with merchant count grown since this was written, that's
+  // what pushed the whole "Sync now" button (all six light steps run
+  // sequentially) past its 240s budget with nothing to show for it. Each
+  // row's own retry-on-conflict logic is unaffected by running concurrently
+  // — a genuine ristaBrandId race just falls through to the same retry
+  // path, and Postgres serializes the actual conflicting writes.
+  const results = await mapWithConcurrency(rows, 15, async (row) => {
     const dotpeMid = normalizeMid(row.merchant_id);
     const licenseStatus = mapCrmLicenseStatus(row.crm_status);
     const isActive = licenseStatus === "Active";
@@ -82,7 +88,7 @@ export async function syncCrmAdoption() {
 
     try {
       await prisma.merchant.upsert({ where: { dotpeMid }, ...upsertData });
-      count++;
+      return true;
     } catch (error) {
       // Rista can reassign a brand_id to a different merchant (e.g. a
       // rebrand/closure); when that happens, our stale row still holds the
@@ -102,22 +108,22 @@ export async function syncCrmAdoption() {
             data: { ristaBrandId: null },
           });
           await prisma.merchant.upsert({ where: { dotpeMid }, ...upsertData });
-          count++;
-          continue;
+          return true;
         } catch (retryError) {
           console.error(
             `syncCrmAdoption: retry after clearing stale ristaBrandId still failed for ${dotpeMid} (${row.merchant_name})`,
             retryError
           );
-          continue;
+          return false;
         }
       }
 
       console.error(`syncCrmAdoption: skipped merchant ${dotpeMid} (${row.merchant_name})`, error);
+      return false;
     }
-  }
+  });
 
-  return count;
+  return results.filter(Boolean).length;
 }
 
 /**
@@ -127,9 +133,8 @@ export async function syncCrmAdoption() {
  */
 export async function syncCreditPrePost() {
   const rows = await fetchCrmCreditPrePost();
-  let matched = 0;
 
-  for (const row of rows) {
+  const results = await mapWithConcurrency(rows, 15, async (row) => {
     try {
       const result = await prisma.merchant.updateMany({
         where: { brandName: { equals: row["Merchant Name"], mode: "insensitive" } },
@@ -138,13 +143,14 @@ export async function syncCreditPrePost() {
           postCrmCredits: row["After (₹)"] ?? 0,
         },
       });
-      matched += result.count;
+      return result.count;
     } catch (error) {
       console.error(`syncCreditPrePost: skipped "${row["Merchant Name"]}"`, error);
+      return 0;
     }
-  }
+  });
 
-  return matched;
+  return results.reduce((a, b) => a + b, 0);
 }
 
 const CREDIT_BREAKUP_MAX_WEEKS = 13; // ~90 days — covers the dashboard's longest date-range preset
@@ -367,9 +373,8 @@ export async function syncCustomersReachedByWeek() {
 /** Step 4: loyalty program status, enrollment, and points. Update-only. */
 export async function syncLoyaltyFunnel() {
   const rows = await fetchLoyaltyFunnel();
-  let matched = 0;
 
-  for (const row of rows) {
+  const results = await mapWithConcurrency(rows, 15, async (row) => {
     const dotpeMid = normalizeMid(row.merchant_id);
     const status = row.status?.toLowerCase().includes("active") ? "Active" : "Inactive";
 
@@ -384,33 +389,41 @@ export async function syncLoyaltyFunnel() {
           customerCount: Math.round(row.total_enrolled ?? 0),
         },
       });
-      matched += result.count;
+      return result.count;
     } catch (error) {
       console.error(`syncLoyaltyFunnel: skipped merchant ${dotpeMid}`, error);
+      return 0;
     }
-  }
+  });
 
-  return matched;
+  return results.reduce((a, b) => a + b, 0);
 }
 
 /** Step 5: loyalty messaging credit spend — folds into the loyalty slice of creditConsumptionBreakup. */
 export async function syncLoyaltyMessages() {
   const rows = await fetchLoyaltyMessages();
-  let matched = 0;
 
-  for (const row of rows) {
+  // Concurrency here is safe as long as every merchant_id in this query's
+  // rows is unique (mergeCreditBreakup does its own read-modify-write on
+  // Merchant.creditConsumptionBreakup, which would race if the same
+  // merchant were touched twice at once — but that can only happen across
+  // *different* sync steps sharing a merchant, not within a single row set
+  // from one query, so syncRedashLight still runs this step-to-step
+  // sequentially rather than in parallel with syncAutomations).
+  const results = await mapWithConcurrency(rows, 15, async (row) => {
     const dotpeMid = normalizeMid(row.merchant_id);
     try {
       const merchant = await prisma.merchant.findUnique({ where: { dotpeMid }, select: { id: true } });
-      if (!merchant) continue;
+      if (!merchant) return false;
       await mergeCreditBreakup(merchant.id, { loyalty: row.cost ?? 0 });
-      matched++;
+      return true;
     } catch (error) {
       console.error(`syncLoyaltyMessages: skipped merchant ${dotpeMid}`, error);
+      return false;
     }
-  }
+  });
 
-  return matched;
+  return results.filter(Boolean).length;
 }
 
 /**
@@ -445,11 +458,10 @@ export async function syncAutomations() {
     byMerchant.set(dotpeMid, entry);
   }
 
-  let matched = 0;
-  for (const [dotpeMid, entry] of byMerchant) {
+  const results = await mapWithConcurrency(Array.from(byMerchant), 15, async ([dotpeMid, entry]) => {
     try {
       const merchant = await prisma.merchant.findUnique({ where: { dotpeMid }, select: { id: true } });
-      if (!merchant) continue;
+      if (!merchant) return false;
 
       await prisma.merchant.update({
         where: { id: merchant.id },
@@ -460,13 +472,14 @@ export async function syncAutomations() {
         },
       });
       await mergeCreditBreakup(merchant.id, { automations: entry.sendCost });
-      matched++;
+      return true;
     } catch (error) {
       console.error(`syncAutomations: skipped merchant ${dotpeMid}`, error);
+      return false;
     }
-  }
+  });
 
-  return matched;
+  return results.filter(Boolean).length;
 }
 
 /**
@@ -477,11 +490,10 @@ export async function syncAutomations() {
  */
 export async function syncPortfolioTrend() {
   const rows = await fetchCrmWeeklyTrend(12);
-  let written = 0;
 
-  for (const row of rows) {
+  const results = await mapWithConcurrency(rows, 12, async (row) => {
     const week = row["Week Start"];
-    if (!week) continue;
+    if (!week) return false;
     try {
       await prisma.portfolioTrend.upsert({
         where: { week },
@@ -495,13 +507,14 @@ export async function syncPortfolioTrend() {
           recharged: row["Total Recharged (₹)"] ?? 0,
         },
       });
-      written++;
+      return true;
     } catch (error) {
       console.error(`syncPortfolioTrend: skipped week ${week}`, error);
+      return false;
     }
-  }
+  });
 
-  return written;
+  return results.filter(Boolean).length;
 }
 
 // Everything except creditConsumptionByWeek — that step alone has measured
