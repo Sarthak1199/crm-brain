@@ -45,10 +45,18 @@ export default async function DashboardPage({
   const session = await auth();
   const canEditRoadmap = canMutate(session?.user?.role, "roadmap");
 
-  const where: Prisma.MerchantWhereInput = {};
+  // Sales Status ("Total Collected (INR)"/"(Branches)" and both donut
+  // charts) is tagged `latest` in the UI — an all-time snapshot the date
+  // filter isn't supposed to touch, same promise as every other `latest`
+  // chart on this page. It still respects an explicit mx selection (a
+  // different kind of narrowing — which merchants, not which time window)
+  // via `salesStatusWhere.id` below, just not the date range.
+  const salesStatusWhere: Prisma.MerchantWhereInput = {};
   if (selectedIds.length > 0) {
-    where.id = { in: selectedIds };
+    salesStatusWhere.id = { in: selectedIds };
   }
+
+  const where: Prisma.MerchantWhereInput = { ...salesStatusWhere };
   if (params.from || params.to) {
     where.OR = [
       { paymentCollectedDate: null },
@@ -76,39 +84,41 @@ export default async function DashboardPage({
   const snapshotDateFilter: Prisma.MerchantSnapshotWhereInput =
     params.from || params.to ? { capturedAt: capturedAtFilter } : {};
 
-  const [merchants, allMerchants, roadmapItems, supportRequests, onboardingRequests] = await Promise.all([
-    prisma.merchant.findMany({
-      where,
-      orderBy: { brandName: "asc" },
-      include: {
-        snapshots: {
-          where: {
-            fieldName: {
-              in: [
-                "creditConsumption.total",
-                "creditConsumption.campaigns",
-                "creditConsumption.automations",
-                "creditConsumption.loyalty",
-                "customersReached.total",
-                "customersReached.campaigns",
-                "customersReached.automations",
-                "customersReached.loyalty",
-              ],
+  const [merchants, salesStatusMerchants, allMerchants, roadmapItems, supportRequests, onboardingRequests] =
+    await Promise.all([
+      prisma.merchant.findMany({
+        where,
+        orderBy: { brandName: "asc" },
+        include: {
+          snapshots: {
+            where: {
+              fieldName: {
+                in: [
+                  "creditConsumption.total",
+                  "creditConsumption.campaigns",
+                  "creditConsumption.automations",
+                  "creditConsumption.loyalty",
+                  "customersReached.total",
+                  "customersReached.campaigns",
+                  "customersReached.automations",
+                  "customersReached.loyalty",
+                ],
+              },
+              ...snapshotDateFilter,
             },
-            ...snapshotDateFilter,
+            orderBy: { capturedAt: "asc" },
           },
-          orderBy: { capturedAt: "asc" },
         },
-      },
-    }),
-    prisma.merchant.findMany({ select: { id: true, brandName: true }, orderBy: { brandName: "asc" } }),
-    prisma.roadmapItem.findMany({ orderBy: { title: "asc" } }),
-    prisma.supportRequest.findMany(),
-    prisma.onboardingRequest.findMany({
-      where: { merchantId: { not: null } },
-      select: { merchantId: true, loyaltyEnabled: true },
-    }),
-  ]);
+      }),
+      prisma.merchant.findMany({ where: salesStatusWhere, orderBy: { brandName: "asc" } }),
+      prisma.merchant.findMany({ select: { id: true, brandName: true }, orderBy: { brandName: "asc" } }),
+      prisma.roadmapItem.findMany({ orderBy: { title: "asc" } }),
+      prisma.supportRequest.findMany(),
+      prisma.onboardingRequest.findMany({
+        where: { merchantId: { not: null } },
+        select: { merchantId: true, loyaltyEnabled: true },
+      }),
+    ]);
 
   const roadmapRows = roadmapItems.map(serializeRoadmapItem);
   const requestRows = supportRequests.map(serializeSupportRequest);
@@ -129,6 +139,7 @@ export default async function DashboardPage({
     snapshots: snapshots.map(serializeSnapshot),
   }));
   const mList = serialized.map((r) => r.merchant);
+  const salesStatusMList = salesStatusMerchants.map(serializeMerchant);
   const snapshotsByMerchant = Object.fromEntries(
     serialized.map((r) => [r.merchant.id, r.snapshots])
   );
@@ -158,7 +169,7 @@ export default async function DashboardPage({
 
         <section>
           <h2 className="mb-3 text-[16px] font-semibold text-foreground">Sales Status</h2>
-          <SalesStatusSection data={salesStatus(mList)} merchants={mList} />
+          <SalesStatusSection data={salesStatus(salesStatusMList)} merchants={salesStatusMList} />
         </section>
 
         <section>
