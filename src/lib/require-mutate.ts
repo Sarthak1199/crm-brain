@@ -11,3 +11,15 @@ export async function requireMutate(area: MutationArea = "general") {
     throw new Error("You don't have permission to make changes here.");
   }
 }
+
+// Looser than requireMutate: any signed-in role (including USER) may pass,
+// only an actual session is required. Filing a bug/feature request is
+// meant to be open to whoever hits the problem, not just Admin/Manager —
+// unlike editing or deleting an existing request, which stays Admin/Manager
+// only via requireMutate.
+export async function requireAuthenticated() {
+  const session = await auth();
+  if (!session?.user) {
+    throw new Error("You must be signed in to do this.");
+  }
+}

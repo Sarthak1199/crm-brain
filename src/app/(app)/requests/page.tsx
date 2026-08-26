@@ -21,6 +21,10 @@ export default async function RequestsPage({
   const params = await searchParams;
   const session = await auth();
   const canEdit = canMutate(session?.user?.role);
+  // Filing a new request is open to any signed-in role — see
+  // requireAuthenticated() in requests/actions.ts, the real enforcement
+  // boundary. Editing/deleting an existing one stays Admin/Manager (canEdit).
+  const canCreate = !!session?.user;
 
   const where: Prisma.SupportRequestWhereInput = {};
   if (params.type === "Bug" || params.type === "Feature") {
@@ -68,7 +72,7 @@ export default async function RequestsPage({
           title="Bug & Feature Requests"
           description="Requests logged against merchants, with their footprint at time of filing."
         />
-        {canEdit ? <RequestForm merchants={merchantOptions} /> : null}
+        {canCreate ? <RequestForm merchants={merchantOptions} /> : null}
       </div>
 
       <div className="mb-5">

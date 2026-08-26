@@ -5,7 +5,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireMutate } from "@/lib/require-mutate";
+import { requireMutate, requireAuthenticated } from "@/lib/require-mutate";
 
 const MAX_FILES = 6;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -150,7 +150,7 @@ export async function createSupportRequest(
   _prevState: string | undefined,
   formData: FormData
 ): Promise<string | undefined> {
-  await requireMutate();
+  await requireAuthenticated();
   const parsed = parseMultiDescriptionFields(formData);
   if ("error" in parsed) return parsed.error;
   const { shared, descriptions } = parsed.data;
