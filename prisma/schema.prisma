@@ -220,13 +220,20 @@ enum SupportRequestType {
 }
 
 model SupportRequest {
-  id             String             @id @default(cuid())
-  merchantId     String
-  merchant       Merchant           @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  id         String              @id @default(cuid())
+  // Nullable: a request can be filed against a merchant that doesn't exist
+  // in the Merchant table yet (typed as free text instead) — see
+  // merchantNameFreeText. SetNull rather than Cascade so deleting the
+  // merchant later doesn't take its request history down with it.
+  merchantId String?
+  merchant   Merchant?           @relation(fields: [merchantId], references: [id], onDelete: SetNull)
+  // Set only when merchantId is null — the name as typed, not backed by a
+  // real Merchant row (no totalStores/totalYearlyPotential to auto-fill from).
+  merchantNameFreeText String?
   type           SupportRequestType
   description    String
   images         Json? // string[] of file paths under /uploads/requests/{id}/
-  // Manual entry at submission time (not auto-computed from merchant data) — editable after the fact
+  // Manual entry at submission time (not auto-computed from merchant data)
   totalBranches  Int                @default(0)
   totalPotential Decimal            @default(0) @db.Decimal(14, 2)
   productRemarks String?

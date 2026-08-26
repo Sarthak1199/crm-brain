@@ -337,10 +337,13 @@ export function requestTypeStats(requests: SerializedSupportRequest[]) {
     // merchant's branches/potential describe the merchant, not the ask —
     // summing per row would multiply them by however many requests that
     // merchant has logged. Count each merchant's footprint once per type.
+    // A request with no real merchant (a freshly-typed name) has no shared
+    // identity to dedupe against — falls back to its own request id.
     const perMerchant = new Map<string, { totalBranches: number; totalPotential: number }>();
     for (const r of list) {
-      if (!perMerchant.has(r.merchantId)) {
-        perMerchant.set(r.merchantId, { totalBranches: r.totalBranches, totalPotential: r.totalPotential });
+      const key = r.merchantId ?? r.id;
+      if (!perMerchant.has(key)) {
+        perMerchant.set(key, { totalBranches: r.totalBranches, totalPotential: r.totalPotential });
       }
     }
 

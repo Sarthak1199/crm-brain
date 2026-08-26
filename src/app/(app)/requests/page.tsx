@@ -55,11 +55,15 @@ export default async function RequestsPage({
 
   // A merchant can have multiple request rows (one per individual ask), but
   // branches/potential describe the merchant, not the ask — count each
-  // merchant's footprint once, not once per request against it.
+  // merchant's footprint once, not once per request against it. A request
+  // with no real merchant (a freshly-typed name) has no shared identity to
+  // dedupe against, so it falls back to its own request id as the key —
+  // each such row counts on its own.
   const perMerchant = new Map<string, { totalBranches: number; totalPotential: number }>();
   for (const r of rows) {
-    if (!perMerchant.has(r.merchantId)) {
-      perMerchant.set(r.merchantId, { totalBranches: r.totalBranches, totalPotential: r.totalPotential });
+    const key = r.merchantId ?? r.id;
+    if (!perMerchant.has(key)) {
+      perMerchant.set(key, { totalBranches: r.totalBranches, totalPotential: r.totalPotential });
     }
   }
   const totalBranches = Array.from(perMerchant.values()).reduce((a, r) => a + r.totalBranches, 0);
@@ -80,7 +84,7 @@ export default async function RequestsPage({
       </div>
 
       <div className="mb-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-        <StatCard icon={Building2} label="Total Branches" value={formatNumber(totalBranches)} />
+        <StatCard icon={Building2} label="Total Loyalty Branches" value={formatNumber(totalBranches)} />
         <StatCard icon={IndianRupee} label="Total Potential" value={formatInr(totalPotential, { compact: true })} />
         <StatCard
           icon={params.type === "Bug" ? Bug : params.type === "Feature" ? Lightbulb : Building2}
@@ -89,7 +93,7 @@ export default async function RequestsPage({
         />
       </div>
 
-      <RequestsTable rows={rows} merchants={merchantOptions} canEdit={canEdit} />
+      <RequestsTable rows={rows} canEdit={canEdit} />
     </div>
   );
 }

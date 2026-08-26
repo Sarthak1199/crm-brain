@@ -8,49 +8,16 @@ import { prisma } from "@/lib/prisma";
 import { requireMutate, requireAuthenticated } from "@/lib/require-mutate";
 
 const MAX_FILES = 6;
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-
-function parseCommonFields(formData: FormData) {
-  const merchantId = formData.get("merchantId");
-  const type = formData.get("type");
-  const description = formData.get("description");
-  const totalBranchesRaw = formData.get("totalBranches");
-  const totalPotentialRaw = formData.get("totalPotential");
-  const productRemarks = formData.get("productRemarks");
-
-  if (typeof merchantId !== "string" || !merchantId) {
-    return { error: "Select a merchant." } as const;
-  }
-  if (type !== "Bug" && type !== "Feature") {
-    return { error: "Select a request type." } as const;
-  }
-  if (typeof description !== "string" || !description.trim()) {
-    return { error: "Description is required." } as const;
-  }
-
-  const totalBranches = Number(totalBranchesRaw);
-  const totalPotential = Number(totalPotentialRaw);
-  if (!Number.isFinite(totalBranches) || totalBranches < 0) {
-    return { error: "Total branches must be a non-negative number." } as const;
-  }
-  if (!Number.isFinite(totalPotential) || totalPotential < 0) {
-    return { error: "Total potential must be a non-negative number." } as const;
-  }
-
-  return {
-    data: {
-      merchantId,
-      type,
-      description: description.trim(),
-      totalBranches: Math.round(totalBranches),
-      totalPotential,
-      productRemarks: typeof productRemarks === "string" && productRemarks.trim() ? productRemarks.trim() : null,
-    },
-  } as const;
-}
+const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB per file
+// Sized to leave headroom under next.config.ts's 10MB Server Action body
+// limit (multipart boundaries/headers and the form's other fields also
+// count against that budget) — see the note there on Vercel's own,
+// lower platform-level request-body ceiling for genuinely large files.
+const MAX_TOTAL_SIZE = 9 * 1024 * 1024;
 
 type SharedFields = {
-  merchantId: string;
+  merchantId: string | null;
+  merchantNameFreeText: string | null;
   type: "Bug" | "Feature";
   totalBranches: number;
   totalPotential: number;
@@ -60,16 +27,24 @@ type SharedFields = {
 // One merchant, one shared branches/potential/remarks — but each free-text
 // description in the repeatable list is its own individual ask, so it
 // becomes its own SupportRequest row (and its own count on the KPI card).
+//
+// Merchant is either an existing one (merchantId set by the combobox) or a
+// typed name for a merchant not yet in the Merchant table (merchantName) —
+// exactly one of the two is expected, not both.
 function parseMultiDescriptionFields(formData: FormData) {
   const merchantId = formData.get("merchantId");
+  const merchantName = formData.get("merchantName");
   const type = formData.get("type");
   const totalBranchesRaw = formData.get("totalBranches");
   const totalPotentialRaw = formData.get("totalPotential");
   const productRemarks = formData.get("productRemarks");
 
-  if (typeof merchantId !== "string" || !merchantId) {
-    return { error: "Select a merchant." } as const;
+  const hasMerchantId = typeof merchantId === "string" && merchantId.trim().length > 0;
+  const hasMerchantName = typeof merchantName === "string" && merchantName.trim().length > 0;
+  if (!hasMerchantId && !hasMerchantName) {
+    return { error: "Select or enter a merchant name." } as const;
   }
+
   if (type !== "Bug" && type !== "Feature") {
     return { error: "Select a request type." } as const;
   }
@@ -77,7 +52,7 @@ function parseMultiDescriptionFields(formData: FormData) {
   const totalBranches = Number(totalBranchesRaw);
   const totalPotential = Number(totalPotentialRaw);
   if (!Number.isFinite(totalBranches) || totalBranches < 0) {
-    return { error: "Total branches must be a non-negative number." } as const;
+    return { error: "Total Loyalty Branches must be a non-negative number." } as const;
   }
   if (!Number.isFinite(totalPotential) || totalPotential < 0) {
     return { error: "Total potential must be a non-negative number." } as const;
@@ -91,24 +66,47 @@ function parseMultiDescriptionFields(formData: FormData) {
     return { error: "Add at least one description." } as const;
   }
 
+  // The one intentionally optional field — no validation needed either way.
+  const productRemarksTrimmed =
+    typeof productRemarks === "string" && productRemarks.trim() ? productRemarks.trim() : null;
+
+  const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length === 0) {
+    return { error: "Attach at least one file." } as const;
+  }
+  if (files.length > MAX_FILES) {
+    return { error: `Attach at most ${MAX_FILES} files.` } as const;
+  }
+  const totalSize = files.reduce((a, f) => a + f.size, 0);
+  if (totalSize > MAX_TOTAL_SIZE) {
+    return { error: `Attachments are too large (max ${Math.floor(MAX_TOTAL_SIZE / (1024 * 1024))}MB total).` } as const;
+  }
+  const oversizeFile = files.find((f) => f.size > MAX_FILE_SIZE);
+  if (oversizeFile) {
+    return { error: `"${oversizeFile.name}" is too large (max ${Math.floor(MAX_FILE_SIZE / (1024 * 1024))}MB per file).` } as const;
+  }
+
   const shared: SharedFields = {
-    merchantId,
+    merchantId: hasMerchantId ? (merchantId as string).trim() : null,
+    merchantNameFreeText: hasMerchantId ? null : (merchantName as string).trim(),
     type,
     totalBranches: Math.round(totalBranches),
     totalPotential,
-    productRemarks: typeof productRemarks === "string" && productRemarks.trim() ? productRemarks.trim() : null,
+    productRemarks: productRemarksTrimmed,
   };
 
   return { data: { shared, descriptions } } as const;
 }
 
-// The client's accept="image/*" and the uploaded File's own .name/.type are
-// both attacker-controlled hints, not proof — a request built by hand could
-// upload anything. Sniff the actual file signature and derive the saved
-// extension from that, so a renamed non-image (e.g. .html, which the
+// The client's `accept` attribute and the uploaded File's own .name/.type
+// are both attacker-controlled hints, not proof — a request built by hand
+// could upload anything. Sniff the actual file signature and derive the
+// saved extension from that, so a renamed file (e.g. .html, which the
 // browser would execute if ever opened directly from /uploads) can't reach
-// disk with a trusted-looking extension.
-const IMAGE_SIGNATURES: { ext: string; matches: (b: Buffer) => boolean }[] = [
+// disk with a trusted-looking extension. CSV has no reliable magic bytes —
+// it's plain text — so it's the one type allowed through on extension
+// alone, guarded by a check that the content doesn't look like markup.
+const FILE_SIGNATURES: { ext: string; matches: (b: Buffer) => boolean }[] = [
   { ext: ".jpg", matches: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
   {
     ext: ".png",
@@ -120,30 +118,52 @@ const IMAGE_SIGNATURES: { ext: string; matches: (b: Buffer) => boolean }[] = [
     ext: ".webp",
     matches: (b) => b.toString("ascii", 0, 4) === "RIFF" && b.toString("ascii", 8, 12) === "WEBP",
   },
+  { ext: ".pdf", matches: (b) => b.toString("ascii", 0, 4) === "%PDF" },
+  // ISO base media (mp4, mov, m4v, ...): "ftyp" box starting at byte 4.
+  { ext: ".mp4", matches: (b) => b.toString("ascii", 4, 8) === "ftyp" },
+  // Modern .xlsx is a zip container — PK local-file-header signature.
+  { ext: ".xlsx", matches: (b) => b[0] === 0x50 && b[1] === 0x4b && b[2] === 0x03 && b[3] === 0x04 },
+  // Legacy .xls (OLE compound file).
+  {
+    ext: ".xls",
+    matches: (b) =>
+      b[0] === 0xd0 && b[1] === 0xcf && b[2] === 0x11 && b[3] === 0xe0 && b[4] === 0xa1 && b[5] === 0xb1,
+  },
 ];
 
-function detectImageExtension(buffer: Buffer): string | null {
-  return IMAGE_SIGNATURES.find((sig) => sig.matches(buffer))?.ext ?? null;
+function detectFileExtension(buffer: Buffer, originalName: string): string | null {
+  const bySignature = FILE_SIGNATURES.find((sig) => sig.matches(buffer))?.ext;
+  if (bySignature) return bySignature;
+
+  // CSV: plain text, no magic bytes to sniff. Trust the extension only,
+  // and only if the content doesn't start with something that looks like
+  // markup (a renamed .html wouldn't pass this).
+  if (originalName.toLowerCase().endsWith(".csv")) {
+    const head = buffer.toString("utf8", 0, Math.min(buffer.length, 512)).trimStart();
+    if (!head.startsWith("<")) return ".csv";
+  }
+
+  return null;
 }
 
-async function saveImages(requestId: string, formData: FormData): Promise<string[]> {
-  const files = formData.getAll("images").filter((f): f is File => f instanceof File && f.size > 0);
+async function saveFiles(requestId: string, formData: FormData): Promise<string[]> {
+  const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
   if (files.length === 0) return [];
 
   const dir = path.join(process.cwd(), "public", "uploads", "requests", requestId);
   await mkdir(dir, { recursive: true });
 
-  const imagePaths: string[] = [];
+  const paths: string[] = [];
   for (const file of files.slice(0, MAX_FILES)) {
     if (file.size > MAX_FILE_SIZE) continue;
     const buffer = Buffer.from(await file.arrayBuffer());
-    const ext = detectImageExtension(buffer);
-    if (!ext) continue; // not a real image by content — skip silently
+    const ext = detectFileExtension(buffer, file.name);
+    if (!ext) continue; // not a recognized type by content — skip silently
     const safeName = `${randomUUID()}${ext}`;
     await writeFile(path.join(dir, safeName), buffer);
-    imagePaths.push(`/uploads/requests/${requestId}/${safeName}`);
+    paths.push(`/uploads/requests/${requestId}/${safeName}`);
   }
-  return imagePaths;
+  return paths;
 }
 
 export async function createSupportRequest(
@@ -155,46 +175,27 @@ export async function createSupportRequest(
   if ("error" in parsed) return parsed.error;
   const { shared, descriptions } = parsed.data;
 
-  const merchant = await prisma.merchant.findUnique({ where: { id: shared.merchantId } });
-  if (!merchant) return "Merchant not found.";
+  if (shared.merchantId) {
+    const merchant = await prisma.merchant.findUnique({ where: { id: shared.merchantId } });
+    if (!merchant) return "Merchant not found.";
+  }
 
   for (const description of descriptions) {
     const created = await prisma.supportRequest.create({
       data: { ...shared, description },
     });
 
-    const newImages = await saveImages(created.id, formData);
-    if (newImages.length > 0) {
-      await prisma.supportRequest.update({ where: { id: created.id }, data: { images: newImages } });
+    const newFiles = await saveFiles(created.id, formData);
+    if (newFiles.length === 0) {
+      // Every file failed content sniffing (or was silently dropped for
+      // size) — the request is still created (its own description is real
+      // and shouldn't be lost), but a request with 0 saved files despite
+      // the field being required would be a confusing dead end otherwise.
+      await prisma.supportRequest.delete({ where: { id: created.id } });
+      return "None of the attached files could be saved — check the file type and try again.";
     }
+    await prisma.supportRequest.update({ where: { id: created.id }, data: { images: newFiles } });
   }
-
-  revalidatePath("/requests");
-  return undefined;
-}
-
-export async function updateSupportRequest(
-  requestId: string,
-  _prevState: string | undefined,
-  formData: FormData
-): Promise<string | undefined> {
-  await requireMutate();
-  const parsed = parseCommonFields(formData);
-  if ("error" in parsed) return parsed.error;
-
-  const existing = await prisma.supportRequest.findUnique({ where: { id: requestId } });
-  if (!existing) return "Request not found.";
-
-  const newImages = await saveImages(requestId, formData);
-  const existingImages = Array.isArray(existing.images) ? (existing.images as string[]) : [];
-
-  await prisma.supportRequest.update({
-    where: { id: requestId },
-    data: {
-      ...parsed.data,
-      ...(newImages.length > 0 ? { images: [...existingImages, ...newImages] } : {}),
-    },
-  });
 
   revalidatePath("/requests");
   return undefined;

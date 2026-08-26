@@ -17,13 +17,20 @@ import { cn } from "@/lib/utils";
 import type { SerializedSupportRequest } from "@/lib/serialize";
 import { RequestDetailSheet } from "./request-detail-sheet";
 
+// merchant is null for requests filed against a name typed in fresh (not
+// yet a real Merchant row) — merchantNameFreeText carries the typed name
+// in that case, from SerializedSupportRequest.
 export type RequestRow = SerializedSupportRequest & {
-  merchant: { id: string; brandName: string; dotpeMid: string };
+  merchant: { id: string; brandName: string; dotpeMid: string } | null;
 };
 
+function merchantName(r: RequestRow) {
+  return r.merchant?.brandName ?? r.merchantNameFreeText ?? "—";
+}
+
 const ACCESSORS = {
-  brandName: (r: RequestRow) => r.merchant.brandName,
-  dotpeMid: (r: RequestRow) => r.merchant.dotpeMid,
+  brandName: (r: RequestRow) => merchantName(r),
+  dotpeMid: (r: RequestRow) => r.merchant?.dotpeMid ?? "",
   type: (r: RequestRow) => r.type,
   totalBranches: (r: RequestRow) => r.totalBranches,
   totalPotential: (r: RequestRow) => r.totalPotential,
@@ -45,15 +52,11 @@ function TypeBadge({ type }: { type: string }) {
   );
 }
 
-type MerchantOption = { id: string; brandName: string; totalStores: number; totalYearlyPotential: number };
-
 export function RequestsTable({
   rows,
-  merchants,
   canEdit,
 }: {
   rows: RequestRow[];
-  merchants: MerchantOption[];
   canEdit: boolean;
 }) {
   const [selected, setSelected] = useState<RequestRow | null>(null);
@@ -74,9 +77,9 @@ export function RequestsTable({
               Description
             </TableHead>
             <TableHead className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Images
+              Files
             </TableHead>
-            <SortableHead label="Branches" sortKey="totalBranches" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+            <SortableHead label="Total Loyalty Branches" sortKey="totalBranches" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
             <SortableHead label="Potential" sortKey="totalPotential" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
             <SortableHead label="Created" sortKey="createdAt" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
           </TableRow>
@@ -92,10 +95,17 @@ export function RequestsTable({
             sorted.map((row) => (
               <TableRow key={row.id} onClick={() => setSelected(row)} className="cursor-pointer">
                 <TableCell className="px-4 py-3.5 text-[13px] font-medium text-foreground">
-                  {row.merchant.brandName}
+                  <span className="inline-flex items-center gap-1.5">
+                    {merchantName(row)}
+                    {!row.merchant ? (
+                      <span className="inline-flex items-center rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        New
+                      </span>
+                    ) : null}
+                  </span>
                 </TableCell>
                 <TableCell className="px-4 py-3.5 text-[13px] text-muted-foreground">
-                  {row.merchant.dotpeMid}
+                  {row.merchant?.dotpeMid ?? "—"}
                 </TableCell>
                 <TableCell className="px-4 py-3.5">
                   <TypeBadge type={row.type} />
@@ -130,7 +140,6 @@ export function RequestsTable({
 
       <RequestDetailSheet
         row={selected}
-        merchants={merchants}
         canEdit={canEdit}
         onOpenChange={(open) => !open && setSelected(null)}
       />
