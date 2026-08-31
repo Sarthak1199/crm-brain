@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SortableHead } from "@/components/sortable-head";
-import { formatNumber, formatInr, formatDate } from "@/lib/format";
+import { formatNumber, formatInr, formatDate, formatPercent } from "@/lib/format";
 import { useSort } from "@/hooks/use-sort";
 import { cn } from "@/lib/utils";
 import type { SerializedSupportRequest } from "@/lib/serialize";
@@ -21,11 +21,27 @@ import { RequestDetailSheet } from "./request-detail-sheet";
 // yet a real Merchant row) — merchantNameFreeText carries the typed name
 // in that case, from SerializedSupportRequest.
 export type RequestRow = SerializedSupportRequest & {
-  merchant: { id: string; brandName: string; dotpeMid: string } | null;
+  merchant: {
+    id: string;
+    brandName: string;
+    dotpeMid: string;
+    totalStores: number;
+    closedBranches: number;
+    pendingPotential: number;
+  } | null;
 };
 
 function merchantName(r: RequestRow) {
   return r.merchant?.brandName ?? r.merchantNameFreeText ?? "—";
+}
+
+// Outlet closed / total no. of outlets, from the "CRM+Loyalty closures"
+// GSheet tab (synced onto Merchant.closedBranches/totalStores). No
+// denominator means the merchant's outlet count hasn't been captured in
+// that sheet yet, not a real 0% — surfaced as "—", not "0%".
+function closurePercent(r: RequestRow): number | null {
+  if (!r.merchant || r.merchant.totalStores <= 0) return null;
+  return r.merchant.closedBranches / r.merchant.totalStores;
 }
 
 const ACCESSORS = {
@@ -33,7 +49,8 @@ const ACCESSORS = {
   dotpeMid: (r: RequestRow) => r.merchant?.dotpeMid ?? "",
   type: (r: RequestRow) => r.type,
   totalBranches: (r: RequestRow) => r.totalBranches,
-  totalPotential: (r: RequestRow) => r.totalPotential,
+  closurePercent: (r: RequestRow) => closurePercent(r),
+  pendingPotential: (r: RequestRow) => r.merchant?.pendingPotential ?? null,
   createdAt: (r: RequestRow) => new Date(r.createdAt),
 };
 
@@ -84,14 +101,15 @@ export function RequestsTable({
               Files
             </TableHead>
             <SortableHead label="Total Loyalty Branches" sortKey="totalBranches" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
-            <SortableHead label="Potential" sortKey="totalPotential" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+            <SortableHead label="% Closed" sortKey="closurePercent" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+            <SortableHead label="Pending Potential" sortKey="pendingPotential" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
             <SortableHead label="Created" sortKey="createdAt" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {sorted.length === 0 ? (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={8} className="py-12 text-center text-[13px] text-muted-foreground">
+              <TableCell colSpan={9} className="py-12 text-center text-[13px] text-muted-foreground">
                 No requests yet.
               </TableCell>
             </TableRow>
@@ -131,7 +149,10 @@ export function RequestsTable({
                   {formatNumber(row.totalBranches)}
                 </TableCell>
                 <TableCell className="px-4 py-3.5 text-right text-[13px] text-foreground">
-                  {formatInr(row.totalPotential, { compact: true })}
+                  {formatPercent(closurePercent(row))}
+                </TableCell>
+                <TableCell className="px-4 py-3.5 text-right text-[13px] text-foreground">
+                  {row.merchant ? formatInr(row.merchant.pendingPotential, { compact: true }) : "—"}
                 </TableCell>
                 <TableCell className="px-4 py-3.5 text-right text-[13px] text-muted-foreground">
                   {formatDate(row.createdAt)}

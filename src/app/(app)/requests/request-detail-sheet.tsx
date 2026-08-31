@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Section, Field } from "@/components/detail-panel";
-import { formatDate, formatInr, formatNumber } from "@/lib/format";
+import { formatDate, formatInr, formatNumber, formatPercent } from "@/lib/format";
 import { deleteSupportRequest } from "./actions";
 import { RequestForm } from "./request-form";
 import type { RequestRow } from "./requests-table";
@@ -108,7 +108,18 @@ export function RequestDetailSheet({
               <div className="px-4">
                 <Section title="Snapshot">
                   <Field label="Total Loyalty Branches" value={formatNumber(row.totalBranches)} />
-                  <Field label="Total Potential" value={formatInr(row.totalPotential)} />
+                  <Field
+                    label="% Closed"
+                    value={formatPercent(
+                      row.merchant && row.merchant.totalStores > 0
+                        ? row.merchant.closedBranches / row.merchant.totalStores
+                        : null
+                    )}
+                  />
+                  <Field
+                    label="Pending Potential"
+                    value={row.merchant ? formatInr(row.merchant.pendingPotential) : "—"}
+                  />
                 </Section>
 
                 <Section title="Description">
@@ -175,7 +186,6 @@ export function RequestDetailSheet({
             type: row.type,
             description: row.description,
             totalBranches: row.totalBranches,
-            totalPotential: row.totalPotential,
             productRemarks: row.productRemarks,
             images: row.images,
           }}

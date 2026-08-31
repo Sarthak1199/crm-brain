@@ -35,7 +35,18 @@ export default async function RequestsPage({
     prisma.supportRequest.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      include: { merchant: { select: { id: true, brandName: true, dotpeMid: true } } },
+      include: {
+        merchant: {
+          select: {
+            id: true,
+            brandName: true,
+            dotpeMid: true,
+            totalStores: true,
+            closedBranches: true,
+            pendingPotential: true,
+          },
+        },
+      },
     }),
     prisma.merchant.findMany({
       select: { id: true, brandName: true, totalStores: true, totalYearlyPotential: true },
@@ -45,7 +56,7 @@ export default async function RequestsPage({
 
   const rows = requests.map((r) => ({
     ...serializeSupportRequest(r),
-    merchant: r.merchant,
+    merchant: r.merchant ? { ...r.merchant, pendingPotential: Number(r.merchant.pendingPotential) } : null,
   }));
 
   const merchantOptions = merchants.map((m) => ({
@@ -58,16 +69,19 @@ export default async function RequestsPage({
   // merchant's footprint once, not once per request against it. A request
   // with no real merchant (a freshly-typed name) has no shared identity to
   // dedupe against, so it falls back to its own request id as the key —
-  // each such row counts on its own.
-  const perMerchant = new Map<string, { totalBranches: number; totalPotential: number }>();
+  // each such row counts on its own. Pending potential comes live off the
+  // merchant record (synced from the closures sheet), not a per-request
+  // snapshot, so it reflects the latest sync rather than what it was when
+  // the request was filed.
+  const perMerchant = new Map<string, { totalBranches: number; pendingPotential: number }>();
   for (const r of rows) {
     const key = r.merchantId ?? r.id;
     if (!perMerchant.has(key)) {
-      perMerchant.set(key, { totalBranches: r.totalBranches, totalPotential: r.totalPotential });
+      perMerchant.set(key, { totalBranches: r.totalBranches, pendingPotential: r.merchant?.pendingPotential ?? 0 });
     }
   }
   const totalBranches = Array.from(perMerchant.values()).reduce((a, r) => a + r.totalBranches, 0);
-  const totalPotential = Array.from(perMerchant.values()).reduce((a, r) => a + r.totalPotential, 0);
+  const pendingPotential = Array.from(perMerchant.values()).reduce((a, r) => a + r.pendingPotential, 0);
 
   return (
     <div>
@@ -85,7 +99,7 @@ export default async function RequestsPage({
 
       <div className="mb-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
         <StatCard icon={Building2} label="Total Loyalty Branches" value={formatNumber(totalBranches)} />
-        <StatCard icon={IndianRupee} label="Total Potential" value={formatInr(totalPotential, { compact: true })} />
+        <StatCard icon={IndianRupee} label="Pending Potential" value={formatInr(pendingPotential, { compact: true })} />
         <StatCard
           icon={params.type === "Bug" ? Bug : params.type === "Feature" ? Lightbulb : Building2}
           label="Requests"

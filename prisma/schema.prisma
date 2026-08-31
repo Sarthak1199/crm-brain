@@ -111,6 +111,10 @@ model Merchant {
   totalYearlyPotential Decimal   @default(0) @db.Decimal(14, 2)
   subscriptionRevenue  Decimal   @default(0) @db.Decimal(14, 2)
   creditConsumedL30    Decimal   @default(0) @db.Decimal(14, 2)
+  // Source: the closures sheet's "Pending potential closure" column — the
+  // yearly potential still locked up in outlets that haven't closed yet
+  // (as opposed to totalYearlyPotential, the merchant's full footprint).
+  pendingPotential Decimal @default(0) @db.Decimal(14, 2)
 
   // Competitor presence (branch counts on DotPe CRM's product surface)
   reeloBranches       Int @default(0)

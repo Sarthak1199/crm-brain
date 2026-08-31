@@ -31,6 +31,11 @@ export function formatDate(value: Date | string | null | undefined) {
   return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(d);
 }
 
+export function formatPercent(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  return `${Math.round(value * 100)}%`;
+}
+
 export function toNumber(value: unknown): number {
   if (value === null || value === undefined) return 0;
   const n = typeof value === "string" ? Number(value) : Number(value);

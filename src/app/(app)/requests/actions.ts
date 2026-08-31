@@ -18,7 +18,6 @@ type SharedFields = {
   merchantNameFreeText: string | null;
   type: "Bug" | "Feature";
   totalBranches: number;
-  totalPotential: number;
   productRemarks: string | null;
 };
 
@@ -27,7 +26,6 @@ function parseSharedFields(formData: FormData): { error: string } | { data: Shar
   const merchantName = formData.get("merchantName");
   const type = formData.get("type");
   const totalBranchesRaw = formData.get("totalBranches");
-  const totalPotentialRaw = formData.get("totalPotential");
   const productRemarks = formData.get("productRemarks");
 
   const hasMerchantId = typeof merchantId === "string" && merchantId.trim().length > 0;
@@ -41,12 +39,8 @@ function parseSharedFields(formData: FormData): { error: string } | { data: Shar
   }
 
   const totalBranches = Number(totalBranchesRaw);
-  const totalPotential = Number(totalPotentialRaw);
   if (!Number.isFinite(totalBranches) || totalBranches < 0) {
     return { error: "Total Loyalty Branches must be a non-negative number." } as const;
-  }
-  if (!Number.isFinite(totalPotential) || totalPotential < 0) {
-    return { error: "Total potential must be a non-negative number." } as const;
   }
 
   // The one intentionally optional field — no validation needed either way.
@@ -58,7 +52,6 @@ function parseSharedFields(formData: FormData): { error: string } | { data: Shar
     merchantNameFreeText: hasMerchantId ? null : (merchantName as string).trim(),
     type,
     totalBranches: Math.round(totalBranches),
-    totalPotential,
     productRemarks: productRemarksTrimmed,
   };
 
@@ -81,7 +74,7 @@ function parseFiles(formData: FormData): { error: string } | { data: File[] } {
   return { data: files } as const;
 }
 
-// One merchant, one shared branches/potential/remarks — but each free-text
+// One merchant, one shared branches/remarks — but each free-text
 // description in the repeatable list is its own individual ask, so it
 // becomes its own SupportRequest row (and its own count on the KPI card).
 //
@@ -199,14 +192,18 @@ export async function createSupportRequest(
   if ("error" in parsed) return parsed.error;
   const { shared, descriptions, files } = parsed.data;
 
+  // totalPotential is no longer entered by hand — it tracks the merchant's
+  // live pendingPotential (synced from the closures sheet) at write time.
+  let totalPotential = 0;
   if (shared.merchantId) {
     const merchant = await prisma.merchant.findUnique({ where: { id: shared.merchantId } });
     if (!merchant) return "Merchant not found.";
+    totalPotential = Number(merchant.pendingPotential);
   }
 
   for (const description of descriptions) {
     const created = await prisma.supportRequest.create({
-      data: { ...shared, description },
+      data: { ...shared, description, totalPotential },
     });
 
     if (files.length > 0) {
@@ -234,9 +231,13 @@ export async function updateSupportRequest(
   const existing = await prisma.supportRequest.findUnique({ where: { id: requestId } });
   if (!existing) return "Request not found.";
 
+  // Same live-tracking as create — re-synced on every save, in case the
+  // merchant changed or the sheet's pending potential moved since filing.
+  let totalPotential = 0;
   if (shared.merchantId) {
     const merchant = await prisma.merchant.findUnique({ where: { id: shared.merchantId } });
     if (!merchant) return "Merchant not found.";
+    totalPotential = Number(merchant.pendingPotential);
   }
 
   const newFiles = files.length > 0 ? await saveFiles(requestId, files) : [];
@@ -247,6 +248,7 @@ export async function updateSupportRequest(
     data: {
       ...shared,
       description,
+      totalPotential,
       ...(newFiles.length > 0 ? { images: [...existingImages, ...newFiles] } : {}),
     },
   });

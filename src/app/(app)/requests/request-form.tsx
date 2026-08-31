@@ -18,7 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-type MerchantOption = { id: string; brandName: string; totalStores: number; totalYearlyPotential: number };
+type MerchantOption = { id: string; brandName: string; totalStores: number };
 
 export type ExistingRequest = {
   id: string;
@@ -27,7 +27,6 @@ export type ExistingRequest = {
   type: "Bug" | "Feature";
   description: string;
   totalBranches: number;
-  totalPotential: number;
   productRemarks: string | null;
   images: string[];
 };
@@ -70,7 +69,6 @@ export function RequestForm({
   const [merchantName, setMerchantName] = useState<string | null>(existing?.merchantNameFreeText ?? null);
   const [type, setType] = useState<"Bug" | "Feature" | "">(existing?.type ?? "");
   const [totalBranches, setTotalBranches] = useState(existing?.totalBranches?.toString() ?? "");
-  const [totalPotential, setTotalPotential] = useState(existing?.totalPotential?.toString() ?? "");
   const [descriptions, setDescriptions] = useState<DescriptionField[]>(() =>
     isEdit ? [{ key: "existing", value: existing.description }] : [emptyField()]
   );
@@ -89,7 +87,6 @@ export function RequestForm({
       setMerchantName(null);
       setType("");
       setTotalBranches("");
-      setTotalPotential("");
       setDescriptions([emptyField()]);
     }
     previews.forEach((p) => p.url && URL.revokeObjectURL(p.url));
@@ -117,7 +114,6 @@ export function RequestForm({
       const m = merchants.find((x) => x.id === id);
       if (m) {
         setTotalBranches(String(m.totalStores));
-        setTotalPotential(String(Math.round(m.totalYearlyPotential)));
       }
     }
   }
@@ -126,10 +122,9 @@ export function RequestForm({
     setMerchantId(null);
     setMerchantName(name);
     if (!isEdit) {
-      // A merchant that doesn't exist yet has no branches/potential to
-      // auto-fill from — left for the filer to enter manually.
+      // A merchant that doesn't exist yet has no branch count to auto-fill
+      // from — left for the filer to enter manually.
       setTotalBranches("");
-      setTotalPotential("");
     }
   }
 
@@ -165,7 +160,7 @@ export function RequestForm({
         <DialogTitle>{isEdit ? "Edit request" : "New bug or feature request"}</DialogTitle>
         <DialogDescription>
           {isEdit
-            ? "Update any field — branches, potential, and remarks are manual, so adjust as needed."
+            ? "Update any field — branches and remarks are manual, so adjust as needed."
             : "Logged against one merchant. Add a description per individual ask — each becomes its own request."}
         </DialogDescription>
       </DialogHeader>
@@ -198,44 +193,26 @@ export function RequestForm({
           />
           {merchantName ? (
             <p className="text-[12px] text-muted-foreground">
-              New merchant — not yet in the system, so branches/potential below won&apos;t auto-fill.
+              New merchant — not yet in the system, so branches below won&apos;t auto-fill.
             </p>
           ) : null}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="totalBranches" className="text-[13px] font-medium text-foreground">
-              Total Loyalty Branches
-            </Label>
-            <Input
-              id="totalBranches"
-              name="totalBranches"
-              type="number"
-              min={0}
-              value={totalBranches}
-              onChange={(e) => setTotalBranches(e.target.value)}
-              placeholder={selectedMerchant ? String(selectedMerchant.totalStores) : "0"}
-              required
-              className="h-9 rounded-lg text-[13px]"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="totalPotential" className="text-[13px] font-medium text-foreground">
-              Total potential (₹)
-            </Label>
-            <Input
-              id="totalPotential"
-              name="totalPotential"
-              type="number"
-              min={0}
-              value={totalPotential}
-              onChange={(e) => setTotalPotential(e.target.value)}
-              placeholder="0"
-              required
-              className="h-9 rounded-lg text-[13px]"
-            />
-          </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="totalBranches" className="text-[13px] font-medium text-foreground">
+            Total Loyalty Branches
+          </Label>
+          <Input
+            id="totalBranches"
+            name="totalBranches"
+            type="number"
+            min={0}
+            value={totalBranches}
+            onChange={(e) => setTotalBranches(e.target.value)}
+            placeholder={selectedMerchant ? String(selectedMerchant.totalStores) : "0"}
+            required
+            className="h-9 rounded-lg text-[13px]"
+          />
         </div>
 
         <div className="flex flex-col gap-1.5">

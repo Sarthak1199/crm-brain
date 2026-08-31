@@ -3,6 +3,7 @@ import type { Merchant, MerchantSnapshot, SupportRequest, RoadmapItem } from "@p
 const DECIMAL_FIELDS = [
   "paymentCollected",
   "totalYearlyPotential",
+  "pendingPotential",
   "preCrmCredits",
   "postCrmCredits",
   "momCreditConsumption",
