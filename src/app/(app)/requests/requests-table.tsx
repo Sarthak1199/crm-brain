@@ -135,7 +135,11 @@ export function RequestsTable({
                   <TypeBadge type={row.type} />
                 </TableCell>
                 <TableCell className="max-w-xs px-4 py-3.5 text-[13px] text-foreground">
-                  <p className="truncate">{row.description}</p>
+                  {/* line-clamp instead of a single truncated line — some
+                      descriptions pack several numbered items into one
+                      block of text rather than using "Add another
+                      request", and a single line hid that entirely. */}
+                  <p className="line-clamp-2 whitespace-pre-line">{row.description}</p>
                 </TableCell>
                 <TableCell className="px-4 py-3.5">
                   {row.images.length > 0 ? (
