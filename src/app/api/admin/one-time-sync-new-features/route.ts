@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { syncGsheets } from "@/lib/sync/sync-gsheets";
 import { syncRedashMxGrainWeekly } from "@/lib/sync/sync-redash";
 import { prisma } from "@/lib/prisma";
+import { mapRoadmapLifecycleStatus, KNOWN_ROADMAP_STATUSES } from "@/lib/roadmap-status";
 
 // Temporary, single-use route to populate production with the new
 // features' data right after deploy, rather than waiting for tonight's
@@ -48,6 +49,22 @@ export async function POST(req: NextRequest) {
 
   const target = req.nextUrl.searchParams.get("target");
   try {
+    if (target === "roadmap-manual-backfill") {
+      // syncRoadmap() only replaces sheet-sourced rows (isManual: false) —
+      // manually-created tickets are never touched by any sync, so any
+      // still holding a pre-migration raw status value need a direct fix.
+      const items = await prisma.roadmapItem.findMany({ select: { id: true, status: true, type: true } });
+      let updated = 0;
+      for (const item of items) {
+        if ((KNOWN_ROADMAP_STATUSES as readonly string[]).includes(item.status)) continue;
+        await prisma.roadmapItem.update({
+          where: { id: item.id },
+          data: { status: mapRoadmapLifecycleStatus(item.status), type: item.type ?? (item.status || null) },
+        });
+        updated++;
+      }
+      return NextResponse.json({ ok: true, results: { updated } });
+    }
     const results = target === "mxgrain" ? await syncRedashMxGrainWeekly() : await syncGsheets();
     return NextResponse.json({ ok: true, results });
   } catch (error) {
