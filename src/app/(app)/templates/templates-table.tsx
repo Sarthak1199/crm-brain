@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import {
   Table,
   TableBody,
@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { SortableHead } from "@/components/sortable-head";
 import { formatDate } from "@/lib/format";
 import { useSort } from "@/hooks/use-sort";
@@ -18,29 +19,55 @@ import { TemplateDetailSheet } from "./template-detail-sheet";
 import { HANDLE_LABELS } from "./template-form";
 import type { Channel, Category, DealType, Handle } from "./template-form";
 import type { ApprovalStatus, ExistingApproval } from "./approval-form";
+import { setTemplateDefault } from "./actions";
 
 export type ApprovalRow = ExistingApproval;
 
 export type TemplateRow = {
   id: string;
+  name: string | null;
   channel: Channel;
   dealType: DealType;
   category: Category | null;
   handle: Handle | null;
   requestedMid: string | null;
+  eventId: string | null;
+  isDefault: boolean;
   messageText: string;
   createdAt: string;
   approvals: ApprovalRow[];
 };
 
 const ACCESSORS = {
+  name: (r: TemplateRow) => r.name ?? "",
   channel: (r: TemplateRow) => r.channel,
   dealType: (r: TemplateRow) => r.dealType,
   category: (r: TemplateRow) => r.category ?? "",
   handle: (r: TemplateRow) => (r.handle ? HANDLE_LABELS[r.handle] : ""),
+  eventId: (r: TemplateRow) => r.eventId ?? "",
+  isDefault: (r: TemplateRow) => (r.isDefault ? 1 : 0),
   approvals: (r: TemplateRow) => r.approvals.length,
   createdAt: (r: TemplateRow) => new Date(r.createdAt),
 };
+
+function DefaultToggle({ row, canEdit }: { row: TemplateRow; canEdit: boolean }) {
+  const [checked, setChecked] = useState(row.isDefault);
+  const [isPending, startTransition] = useTransition();
+
+  return (
+    <Switch
+      checked={checked}
+      disabled={!canEdit || isPending}
+      onClick={(e) => e.stopPropagation()}
+      onCheckedChange={(next) => {
+        setChecked(next);
+        startTransition(async () => {
+          await setTemplateDefault(row.id, next);
+        });
+      }}
+    />
+  );
+}
 
 function ChannelBadge({ channel }: { channel: Channel }) {
   return (
@@ -81,6 +108,7 @@ export function TemplatesTable({ rows, canEdit }: { rows: TemplateRow[]; canEdit
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
+            <SortableHead label="Name" sortKey="name" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Channel" sortKey="channel" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Type" sortKey="dealType" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Category" sortKey="category" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -88,6 +116,8 @@ export function TemplatesTable({ rows, canEdit }: { rows: TemplateRow[]; canEdit
             <TableHead className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Message
             </TableHead>
+            <SortableHead label="Event ID" sortKey="eventId" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
+            <SortableHead label="Default" sortKey="isDefault" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Approval" sortKey="approvals" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Created" sortKey="createdAt" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
           </TableRow>
@@ -95,7 +125,7 @@ export function TemplatesTable({ rows, canEdit }: { rows: TemplateRow[]; canEdit
         <TableBody>
           {sorted.length === 0 ? (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={7} className="py-12 text-center text-[13px] text-muted-foreground">
+              <TableCell colSpan={10} className="py-12 text-center text-[13px] text-muted-foreground">
                 No templates yet.
               </TableCell>
             </TableRow>
@@ -104,6 +134,9 @@ export function TemplatesTable({ rows, canEdit }: { rows: TemplateRow[]; canEdit
               const status = bestApprovalStatus(row.approvals);
               return (
                 <TableRow key={row.id} onClick={() => setSelectedId(row.id)} className="cursor-pointer">
+                  <TableCell className="px-4 py-3.5 text-[13px] font-medium text-foreground">
+                    {row.name ?? <span className="text-[12px] font-normal text-muted-foreground/60">—</span>}
+                  </TableCell>
                   <TableCell className="px-4 py-3.5">
                     <ChannelBadge channel={row.channel} />
                   </TableCell>
@@ -124,6 +157,12 @@ export function TemplatesTable({ rows, canEdit }: { rows: TemplateRow[]; canEdit
                   </TableCell>
                   <TableCell className="max-w-sm px-4 py-3.5 text-[13px] text-foreground">
                     <p className="truncate">{row.messageText}</p>
+                  </TableCell>
+                  <TableCell className="px-4 py-3.5 text-[13px] text-muted-foreground">
+                    {row.eventId ?? "—"}
+                  </TableCell>
+                  <TableCell className="px-4 py-3.5">
+                    <DefaultToggle row={row} canEdit={canEdit} />
                   </TableCell>
                   <TableCell className="px-4 py-3.5">
                     {status ? (

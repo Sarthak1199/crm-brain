@@ -129,10 +129,23 @@ model Merchant {
   // from Redash's broader crm_merchants table, which includes non-closed rows).
   crmActivationConfirmed Boolean       @default(false)
   loyaltyStatus          LoyaltyStatus @default(Inactive)
+  // wabaStatus/ristaStatus/dotpeStatus were previously unpopulated by any
+  // sync (always their default) — now fed by the "Has_WABA"/"Has_Rista"/
+  // "Has_Dotpe_Orders" flags on Redash query 11166 (syncMxGrain).
   wabaStatus             WabaStatus    @default(Inactive)
   onboarded              OnboardStatus @default(NotOnboarded)
   ristaStatus            RistaStatus   @default(Inactive)
   dotpeStatus            DotpeStatus   @default(Inactive)
+  // Also from query 11166 ("Has_CRM"/"Has_Loyalty") — deliberately separate
+  // from crmStatus (Redash 10505, the activation-funnel signal) and
+  // loyaltyStatus (the dedicated loyalty-funnel query) above, which are
+  // both already populated by their own more precise sources; this is the
+  // coarser grain-level view specifically for the Licenses section.
+  grainHasCrm                    Boolean  @default(false)
+  grainHasLoyalty                Boolean  @default(false)
+  grainCustomersAcquired         Int      @default(0)
+  grainBranchesTransactingPosL90 Int      @default(0)
+  grainSyncedAt                  DateTime?
 
   // Usage
   customerCount            Int     @default(0)
@@ -256,7 +269,17 @@ model RoadmapItem {
   rista            String? // "Needed" or blank
   priority         String? // P0/P1/P2/P3/"Picked"/blank
   usp              Boolean  @default(false)
-  status           String // primary filter/category — Shipped / Feature / Merchant ask / New Product / Bug / blank; not a strict enum
+  // Pure dev-lifecycle stage: "To Be Picked" / "In Design" / "In Tech" /
+  // "In QA" / "Shipped" — not a strict Prisma enum since the source sheet
+  // isn't guaranteed to stay within these 5 values, but every ingest maps
+  // into them (see mapRoadmapLifecycleStatus in roadmap-status.ts). Prior
+  // to that split, this field also carried category-style values (Feature,
+  // Bug, Merchant ask, ...) — those are preserved in `type` below instead.
+  status           String
+  // The sheet's original status/category label (Feature, Bug, Merchant
+  // ask, New Product, Hygiene feature, or blank) — split out of `status`
+  // once that became a pure lifecycle field, so this data isn't lost.
+  type             String?
   goLiveDate       String? // often not a clean date (e.g. "Sept"), stored as free text
   manpowerWeeks    Decimal? @db.Decimal(6, 2)
   description      String?
@@ -352,23 +375,37 @@ enum TemplateHandle {
 // tags these by hand after import. New templates added through the app's
 // Add Template form always set one (the dropdown has no blank option).
 model Template {
-  id           String            @id @default(cuid())
-  channel      TemplateChannel
-  dealType     TemplateDealType
-  messageText  String
-  category     TemplateCategory?
-  handle       TemplateHandle?
+  id          String            @id @default(cuid())
+  // Short human name (e.g. "points_earned") — the CSV import's primary key
+  // for matching rows on re-upload; older hand-created templates may not
+  // have one.
+  name        String?
+  channel     TemplateChannel
+  dealType    TemplateDealType
+  messageText String
+  category    TemplateCategory?
+  handle      TemplateHandle?
   // Free-text MID of the merchant who asked for this template, if any —
   // distinct from TemplateApproval, which tracks the submission/approval
   // lifecycle itself rather than who originally requested it.
   requestedMid String?
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  // Which triggering event this template fires for (a business-level event
+  // like a points-earned or order-milestone trigger), and whether this is
+  // the template that's actually live for that event when more than one
+  // template maps to the same eventId. Distinct from TemplateApproval.eventId
+  // below, which is a per-submission WhatsApp/Meta review identifier — a
+  // template can accumulate several of those across resubmissions, but this
+  // eventId is the one stable value driving is_default grouping.
+  eventId     String?
+  isDefault   Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
   approvals TemplateApproval[]
 
   @@index([channel])
   @@index([category])
+  @@index([eventId])
 }
 
 enum TemplateApprovalStatus {

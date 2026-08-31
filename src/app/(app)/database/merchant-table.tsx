@@ -29,6 +29,7 @@ const ACCESSORS = {
   onboarded: (r: MerchantRow) => r.merchant.onboarded,
   closedBranches: (r: MerchantRow) => r.merchant.closedBranches,
   totalStores: (r: MerchantRow) => r.merchant.totalStores,
+  grainBranchesTransactingPosL90: (r: MerchantRow) => r.merchant.grainBranchesTransactingPosL90,
   subscriptionRevenue: (r: MerchantRow) => r.merchant.subscriptionRevenue,
   creditConsumedL30: (r: MerchantRow) => r.merchant.creditConsumedL30,
   customerCount: (r: MerchantRow) => r.merchant.customerCount,
@@ -53,6 +54,7 @@ export function MerchantTable({ rows }: { rows: MerchantRow[] }) {
             <SortableHead label="Onboarded" sortKey="onboarded" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Paid Branches" sortKey="closedBranches" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
             <SortableHead label="Total Stores" sortKey="totalStores" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+            <SortableHead label="Transacting (POS, L90)" sortKey="grainBranchesTransactingPosL90" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
             <SortableHead label="Subscription Rev." sortKey="subscriptionRevenue" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
             <SortableHead label="Credits (L30)" sortKey="creditConsumedL30" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
             <SortableHead label="Customer Count" sortKey="customerCount" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
@@ -61,7 +63,7 @@ export function MerchantTable({ rows }: { rows: MerchantRow[] }) {
         <TableBody>
           {sorted.length === 0 ? (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={10} className="py-12 text-center text-[13px] text-muted-foreground">
+              <TableCell colSpan={11} className="py-12 text-center text-[13px] text-muted-foreground">
                 No merchants match these filters.
               </TableCell>
             </TableRow>
@@ -92,6 +94,9 @@ export function MerchantTable({ rows }: { rows: MerchantRow[] }) {
                 </TableCell>
                 <TableCell className="px-4 py-3.5 text-right text-[13px] text-foreground">
                   {formatNumber(row.merchant.totalStores)}
+                </TableCell>
+                <TableCell className="px-4 py-3.5 text-right text-[13px] text-foreground">
+                  {formatNumber(row.merchant.grainBranchesTransactingPosL90)}
                 </TableCell>
                 <TableCell className="px-4 py-3.5 text-right text-[13px] text-foreground">
                   {formatInr(row.merchant.subscriptionRevenue)}

@@ -9,6 +9,7 @@ import {
   fetchCrmWeeklyTrend,
   fetchLoyaltyFunnel,
   fetchLoyaltyMessages,
+  fetchMxGrain,
 } from "./redash-queries";
 import { normalizeMid } from "./mid";
 import { withSyncRun, runStep } from "./sync-run";
@@ -517,6 +518,48 @@ export async function syncPortfolioTrend() {
   return results.filter(Boolean).length;
 }
 
+// Feeds the Licenses section, Consumption Breakdown's "Customers Acquired"
+// column, and the transacting-branches figure — all three read from this
+// one wide query (see fetchMxGrain). Written with bounded concurrency from
+// the start (not a plain per-row loop) — the same serial-write mistake
+// already caused real timeouts elsewhere in this file, no need to repeat
+// it on a query that returns ~15.7k rows.
+export async function syncMxGrain() {
+  const rows = await fetchMxGrain();
+  const merchants = await prisma.merchant.findMany({ select: { id: true, dotpeMid: true } });
+  const merchantIdByMid = new Map(merchants.map((m) => [normalizeMid(m.dotpeMid), m.id]));
+
+  // Filter to matches before touching the DB at all — most of these 15.7k
+  // rows are merchants outside this app's own ~150-200 roster.
+  const matched = rows
+    .map((row) => ({ row, merchantId: merchantIdByMid.get(normalizeMid(String(row.Dotpe_Merchant_ID))) }))
+    .filter((x): x is { row: (typeof rows)[number]; merchantId: string } => !!x.merchantId);
+
+  const results = await mapWithConcurrency(matched, 20, async ({ row, merchantId }) => {
+    try {
+      await prisma.merchant.update({
+        where: { id: merchantId },
+        data: {
+          ristaStatus: row.Has_Rista ? "Active" : "Inactive",
+          dotpeStatus: row.Has_Dotpe_Orders ? "Active" : "Inactive",
+          wabaStatus: row.Has_WABA ? "Active" : "Inactive",
+          grainHasCrm: !!row.Has_CRM,
+          grainHasLoyalty: !!row.Has_Loyalty,
+          grainCustomersAcquired: row.Customers_Acquired ?? 0,
+          grainBranchesTransactingPosL90: row.Branches_Transacting_POS_L90 ?? 0,
+          grainSyncedAt: new Date(),
+        },
+      });
+      return true;
+    } catch (error) {
+      console.error(`syncMxGrain: skipped merchant ${row.Dotpe_Merchant_ID}`, error);
+      return false;
+    }
+  });
+
+  return results.filter(Boolean).length;
+}
+
 // Everything except creditConsumptionByWeek — that step alone has measured
 // ~220s even fully parallelized (Redash's own per-query execution time, not
 // something client-side concurrency can shrink further), while these other
@@ -550,6 +593,15 @@ export async function syncRedashCreditWeekly() {
 export async function syncRedashCustomersReachedWeekly() {
   return withSyncRun("REDASH", async () => ({
     customersReachedByWeek: await runStep("customersReachedByWeek", syncCustomersReachedByWeek),
+  }));
+}
+
+// A single (large) query with max_age forced to 0, not many parallel ones —
+// measured ~3 minutes for the Redash side alone. Same reasoning as the two
+// above: its own cron, not part of the interactive button.
+export async function syncRedashMxGrainWeekly() {
+  return withSyncRun("REDASH", async () => ({
+    mxGrain: await runStep("mxGrain", syncMxGrain),
   }));
 }
 

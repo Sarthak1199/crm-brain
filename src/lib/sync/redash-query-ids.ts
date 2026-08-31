@@ -10,4 +10,10 @@ export const REDASH_QUERY_IDS = {
   loyaltyFunnel: 10921, // Loyalty - Point Program Funnel
   loyaltyMessages: 11054, // Loyalty : Messages tracking
   automationPerRule: 10990, // Per-rule Automation Performance
+  // "DotPe Grain" — wide per-merchant table (123 columns, no params), one
+  // row per Dotpe_Merchant_ID. Feeds the Licenses section (Has_Rista/
+  // Has_Dotpe_Orders/Has_WABA/Has_CRM/Has_Loyalty), Customers_Acquired
+  // (Consumption Breakdown), and Branches_Transacting_POS_L90 (transacting
+  // branches) — all three come from this one query, not separate sources.
+  mxGrain: 11166,
 } as const;

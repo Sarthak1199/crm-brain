@@ -22,10 +22,10 @@ import { CHART_SOURCES } from "@/lib/sync/source-links";
 import { RoadmapPanel } from "../panels/roadmap-panel";
 
 const STAGE_COLORS: Record<string, string> = {
-  "To be picked": "#64748B",
-  "Design ready": "#8B5CF6",
-  Groomed: "#3B82F6",
-  "In Progress": "#F59E0B",
+  "To Be Picked": "#64748B",
+  "In Design": "#8B5CF6",
+  "In Tech": "#3B82F6",
+  "In QA": "#F59E0B",
   Shipped: "#10B981",
 };
 

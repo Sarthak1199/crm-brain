@@ -191,6 +191,11 @@ export function creditConsumptionTable(
         loyalty,
         automations,
         total: campaigns + loyalty + automations,
+        // From the mxGrain sync (Redash 11166's Customers_Acquired) — not
+        // date-range filterable like the fields above, since the grain
+        // query has no date_range param; it's a live snapshot as of the
+        // last sync.
+        customersAcquired: m.grainCustomersAcquired,
       };
     })
     .sort((a, b) => b.total - a.total);
@@ -304,28 +309,20 @@ export function customersReachedTable(
 }
 
 /**
- * Dev-lifecycle waterfall, left to right. "Shipped", "In Progress", and
- * "Groomed" are literal status values in the roadmap sheet. "Design ready"
- * and "To be picked" are not — they're derived from the `design` column
- * (only "✅" means done; "Required"/"Not required"/"Not reqd"/"50% done" do
- * not) for items that haven't reached Groomed/In Progress/Shipped yet.
- * Every item falls into exactly one bucket, first match wins.
+ * Dev-lifecycle waterfall, left to right. `status` is now a pure 5-value
+ * lifecycle field (see mapRoadmapLifecycleStatus in roadmap-status.ts) —
+ * every item falls into exactly one of these stages directly, no longer
+ * derived from the `design` column.
  */
 export function productStatusStages(items: SerializedRoadmapItem[]): FunnelStage[] {
-  const shipped = items.filter((i) => i.status === "Shipped").length;
-  const inProgress = items.filter((i) => i.status === "In Progress").length;
-  const groomed = items.filter((i) => i.status === "Groomed").length;
-  const designReady = items.filter(
-    (i) => !["Shipped", "In Progress", "Groomed"].includes(i.status) && i.design === "✅"
-  ).length;
-  const toBePicked = items.length - shipped - inProgress - groomed - designReady;
+  const count = (stage: string) => items.filter((i) => i.status === stage).length;
 
   return [
-    { stage: "To be picked", count: toBePicked },
-    { stage: "Design ready", count: designReady },
-    { stage: "Groomed", count: groomed },
-    { stage: "In Progress", count: inProgress },
-    { stage: "Shipped", count: shipped },
+    { stage: "To Be Picked", count: count("To Be Picked") },
+    { stage: "In Design", count: count("In Design") },
+    { stage: "In Tech", count: count("In Tech") },
+    { stage: "In QA", count: count("In QA") },
+    { stage: "Shipped", count: count("Shipped") },
   ];
 }
 

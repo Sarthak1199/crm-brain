@@ -20,6 +20,8 @@ export default async function OnboardingPage() {
         totalStores: true,
         crmStatus: true,
         wabaStatus: true,
+        ristaStatus: true,
+        dotpeStatus: true,
         onboardingRequests: { select: { loyaltyEnabled: true } },
       },
       orderBy: { brandName: "asc" },
@@ -39,9 +41,8 @@ export default async function OnboardingPage() {
   // "Dotpe CRM [Activation] — Loyalty enable" GSheet's write-back column.
   const loyaltyLicenseEnabled = requests.filter((r) => r.loyaltyEnabled).length;
   // wabaStatus is the app's existing "Marketing License" field (see the
-  // Merchant License Status table below) — no sync currently writes it, so
-  // this is honestly 0 until a real source for WhatsApp Business API status
-  // is wired up, rather than approximating it from an unrelated field.
+  // Licenses table below) — fed by the mxGrain sync (Redash 11166's
+  // Has_WABA), same source as ristaStatus/dotpeStatus in that table.
   const marketingLicenseEnabled = merchants.filter((m) => m.wabaStatus === "Active").length;
   const finalOnboarded = requests.filter(
     (r) => r.loyaltyEnabled && (!r.crmLicenseRequested || r.crmEnabled)
@@ -69,6 +70,8 @@ export default async function OnboardingPage() {
     crmStatus: m.crmStatus === "NA" ? "Inactive" : m.crmStatus,
     loyaltyStatus: m.onboardingRequests.some((r) => r.loyaltyEnabled) ? "Active" : "Inactive",
     wabaStatus: m.wabaStatus,
+    ristaStatus: m.ristaStatus,
+    dotpeStatus: m.dotpeStatus,
   }));
 
   return (
@@ -98,7 +101,7 @@ export default async function OnboardingPage() {
         />
       </div>
 
-      <h2 className="mb-3 text-[16px] font-semibold text-foreground">Merchant License Status</h2>
+      <h2 className="mb-3 text-[16px] font-semibold text-foreground">Licenses</h2>
       <OnboardingDetailsTable rows={detailsRows} />
     </div>
   );

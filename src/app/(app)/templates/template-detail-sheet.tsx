@@ -76,7 +76,12 @@ export function TemplateDetailSheet({
               <SheetHeader className="border-b border-border pb-4">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <SheetTitle className="text-[18px]">{row.channel}</SheetTitle>
+                    <SheetTitle className="text-[18px]">{row.name ?? row.channel}</SheetTitle>
+                    {row.name ? (
+                      <Badge variant="outline" className="text-[11px]">
+                        {row.channel}
+                      </Badge>
+                    ) : null}
                     <span className="text-[13px] text-muted-foreground">
                       {row.dealType === "WithDeal" ? "With Deal" : "Without Deal"}
                     </span>
@@ -88,6 +93,11 @@ export function TemplateDetailSheet({
                     {row.handle ? (
                       <Badge variant="outline" className="text-[11px]">
                         {HANDLE_LABELS[row.handle]}
+                      </Badge>
+                    ) : null}
+                    {row.isDefault ? (
+                      <Badge className="border-positive/20 bg-positive/10 text-[11px] text-positive-foreground">
+                        Default
                       </Badge>
                     ) : null}
                   </div>
@@ -119,6 +129,7 @@ export function TemplateDetailSheet({
                 </div>
                 <SheetDescription>
                   Created {formatDate(row.createdAt)}
+                  {row.eventId ? ` · Event ID: ${row.eventId}` : ""}
                   {row.requestedMid ? ` · Requested MID: ${row.requestedMid}` : ""}
                 </SheetDescription>
               </SheetHeader>
@@ -196,12 +207,14 @@ export function TemplateDetailSheet({
         <TemplateForm
           existing={{
             id: row.id,
+            name: row.name,
             channel: row.channel,
             dealType: row.dealType,
             messageText: row.messageText,
             category: row.category,
             requestedMid: row.requestedMid,
             handle: row.handle,
+            eventId: row.eventId,
           }}
           onSuccess={() => onOpenChange(false)}
           open={editOpen}

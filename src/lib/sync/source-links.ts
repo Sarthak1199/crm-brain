@@ -18,6 +18,7 @@ const REDASH_QUERY_LABELS = {
   loyaltyFunnel: "Redash: Loyalty Point Program Funnel",
   loyaltyMessages: "Redash: Loyalty Messages Tracking",
   automationPerRule: "Redash: Per-rule Automation Performance",
+  mxGrain: "Redash: DotPe Grain (licenses, customers acquired, transacting branches)",
 } as const;
 
 /** One entry per Redash query id, for linking generically by id. */
@@ -52,7 +53,12 @@ export const CHART_SOURCES = {
   ],
   salesStatus: [GSHEET_SOURCE_LINKS.crmLoyaltyClosures],
   creditPrePost: [REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.crmCreditPrePost]],
-  creditBreakdown: [REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.creditConsumptionBreakup]],
+  creditBreakdown: [
+    REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.creditConsumptionBreakup],
+    REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.mxGrain],
+  ],
+  licenses: [REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.mxGrain]],
+  transactingBranches: [REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.mxGrain]],
   wowByMid: [REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.creditConsumptionBreakup]],
   wowOverall: [REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.crmWeeklyTrend]],
   adoptionStats: [

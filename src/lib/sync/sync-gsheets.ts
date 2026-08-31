@@ -5,6 +5,7 @@ import { withSyncRun, runStep } from "./sync-run";
 import { mapWithConcurrency } from "./concurrency";
 import { GSHEET_SOURCES } from "./gsheet-sources";
 import { syncLoyaltyOnboarding } from "./sync-onboarding";
+import { mapRoadmapLifecycleStatus } from "@/lib/roadmap-status";
 
 export { GSHEET_SOURCES, gsheetUrl } from "./gsheet-sources";
 
@@ -263,21 +264,28 @@ export async function syncRoadmap() {
   const rows = await readSheetAsObjects(source.spreadsheetId, title, source.headerRow);
 
   const items = rows
-    .map((row) => ({
-      theme: pick(row, "theme") ?? null,
-      title: pick(row, "title"),
-      ticketUrl: pick(row, "tickets") ?? null,
-      design: pick(row, "design") ?? null,
-      rista: pick(row, "rista") ?? null,
-      priority: pick(row, "priority") ?? null,
-      usp: !!pick(row, "usp"),
-      status: pick(row, "status") ?? "",
-      goLiveDate: pick(row, "go live") ?? null,
-      manpowerWeeks: parseAmount(pick(row, "manpower weeks")) ?? null,
-      description: pick(row, "description") ?? null,
-      brandSignal: pick(row, "brand signal") ?? null,
-      why: pick(row, "why") ?? null,
-    }))
+    .map((row) => {
+      const rawStatus = pick(row, "status") ?? "";
+      return {
+        theme: pick(row, "theme") ?? null,
+        title: pick(row, "title"),
+        ticketUrl: pick(row, "tickets") ?? null,
+        design: pick(row, "design") ?? null,
+        rista: pick(row, "rista") ?? null,
+        priority: pick(row, "priority") ?? null,
+        usp: !!pick(row, "usp"),
+        // status is the pure lifecycle stage now; the sheet's original
+        // value (which may be a category label, not a stage) is preserved
+        // in type instead — see mapRoadmapLifecycleStatus.
+        status: mapRoadmapLifecycleStatus(rawStatus),
+        type: rawStatus || null,
+        goLiveDate: pick(row, "go live") ?? null,
+        manpowerWeeks: parseAmount(pick(row, "manpower weeks")) ?? null,
+        description: pick(row, "description") ?? null,
+        brandSignal: pick(row, "brand signal") ?? null,
+        why: pick(row, "why") ?? null,
+      };
+    })
     .filter((item): item is typeof item & { title: string } => !!item.title);
 
   await prisma.$transaction([

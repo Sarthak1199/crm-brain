@@ -1,6 +1,6 @@
 "use client";
 
-import { formatInr } from "@/lib/format";
+import { formatInr, formatNumber } from "@/lib/format";
 import { TypedAdoptionPanel, type CommonAdoptionRow, type ExtraColumn } from "./typed-adoption-panel";
 
 export type CreditConsumptionRow = CommonAdoptionRow & {
@@ -10,6 +10,7 @@ export type CreditConsumptionRow = CommonAdoptionRow & {
   loyalty: number;
   automations: number;
   total: number;
+  customersAcquired: number;
 };
 
 const EXTRA_COLUMNS: ExtraColumn<CreditConsumptionRow>[] = [
@@ -54,6 +55,13 @@ const EXTRA_COLUMNS: ExtraColumn<CreditConsumptionRow>[] = [
     align: "right",
     accessor: (r) => r.total,
     render: (r) => formatInr(r.total, { compact: true }),
+  },
+  {
+    key: "customersAcquired",
+    label: "Customers Acquired",
+    align: "right",
+    accessor: (r) => r.customersAcquired,
+    render: (r) => formatNumber(r.customersAcquired),
   },
 ];
 

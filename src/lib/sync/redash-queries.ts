@@ -167,3 +167,24 @@ export async function fetchAutomationPerformance(days = 90) {
   const rows = await runRedashQuery(REDASH_QUERY_IDS.automationPerRule, dateRangeParams(days));
   return rows as unknown as AutomationRuleRow[];
 }
+
+// Only the columns this app actually reads — the query itself returns 123.
+export type MxGrainRow = {
+  Dotpe_Merchant_ID: number;
+  Has_Rista: number;
+  Has_Dotpe_Orders: number;
+  Has_WABA: number;
+  Has_CRM: number;
+  Has_Loyalty: number;
+  Customers_Acquired: number | null;
+  Branches_Transacting_POS_L90: number | null;
+};
+
+// No parameters, ~15.7k rows (DotPe's whole merchant universe, not just
+// this app's ~150-200) — most rows won't match a dotpeMid in our Merchant
+// table and are skipped at write time, same as every other Redash sync
+// here that iterates a wider source than our own roster.
+export async function fetchMxGrain() {
+  const rows = await runRedashQuery(REDASH_QUERY_IDS.mxGrain, {}, 0);
+  return rows as unknown as MxGrainRow[];
+}

@@ -20,6 +20,8 @@ export type OnboardingMerchantRow = {
   crmStatus: string;
   loyaltyStatus: string;
   wabaStatus: string;
+  ristaStatus: string;
+  dotpeStatus: string;
 };
 
 const ACCESSORS = {
@@ -29,6 +31,8 @@ const ACCESSORS = {
   crmStatus: (r: OnboardingMerchantRow) => r.crmStatus,
   loyaltyStatus: (r: OnboardingMerchantRow) => r.loyaltyStatus,
   wabaStatus: (r: OnboardingMerchantRow) => r.wabaStatus,
+  ristaStatus: (r: OnboardingMerchantRow) => r.ristaStatus,
+  dotpeStatus: (r: OnboardingMerchantRow) => r.dotpeStatus,
 };
 
 export function OnboardingDetailsTable({ rows }: { rows: OnboardingMerchantRow[] }) {
@@ -45,15 +49,17 @@ export function OnboardingDetailsTable({ rows }: { rows: OnboardingMerchantRow[]
             <SortableHead label="Brand Name" sortKey="brandName" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="MID" sortKey="dotpeMid" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Branch Size" sortKey="totalStores" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+            <SortableHead label="Rista" sortKey="ristaStatus" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
+            <SortableHead label="DotPe" sortKey="dotpeStatus" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
+            <SortableHead label="WABA" sortKey="wabaStatus" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="CRM License" sortKey="crmStatus" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Loyalty License" sortKey="loyaltyStatus" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
-            <SortableHead label="Marketing License" sortKey="wabaStatus" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
           </TableRow>
         </TableHeader>
         <TableBody>
           {sorted.length === 0 ? (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={6} className="py-12 text-center text-[13px] text-muted-foreground">
+              <TableCell colSpan={8} className="py-12 text-center text-[13px] text-muted-foreground">
                 No merchants yet.
               </TableCell>
             </TableRow>
@@ -68,13 +74,19 @@ export function OnboardingDetailsTable({ rows }: { rows: OnboardingMerchantRow[]
                   {formatNumber(row.totalStores)}
                 </TableCell>
                 <TableCell className="px-4 py-3.5">
+                  <StatusBadge value={row.ristaStatus} />
+                </TableCell>
+                <TableCell className="px-4 py-3.5">
+                  <StatusBadge value={row.dotpeStatus} />
+                </TableCell>
+                <TableCell className="px-4 py-3.5">
+                  <StatusBadge value={row.wabaStatus} />
+                </TableCell>
+                <TableCell className="px-4 py-3.5">
                   <StatusBadge value={row.crmStatus} />
                 </TableCell>
                 <TableCell className="px-4 py-3.5">
                   <StatusBadge value={row.loyaltyStatus} />
-                </TableCell>
-                <TableCell className="px-4 py-3.5">
-                  <StatusBadge value={row.wabaStatus} />
                 </TableCell>
               </TableRow>
             ))

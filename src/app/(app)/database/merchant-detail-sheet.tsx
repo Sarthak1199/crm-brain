@@ -57,6 +57,7 @@ export function MerchantDetailSheet({
                 <Field label="Loyalty Active Stores" value={formatNumber(m.loyaltyActiveStores)} />
                 <Field label="Pending Branches" value={formatNumber(m.pendingBranches)} />
                 <Field label="Closed Branches" value={formatNumber(m.closedBranches)} />
+                <Field label="Transacting Branches (POS, L90)" value={formatNumber(m.grainBranchesTransactingPosL90)} />
               </Section>
 
               <Section title="Commercials">

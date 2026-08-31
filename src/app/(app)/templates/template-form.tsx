@@ -31,12 +31,14 @@ export const HANDLE_LABELS: Record<Handle, string> = {
 
 export type ExistingTemplate = {
   id: string;
+  name: string | null;
   channel: Channel;
   dealType: DealType;
   messageText: string;
   category: Category | null;
   handle: Handle | null;
   requestedMid: string | null;
+  eventId: string | null;
 };
 
 export function TemplateForm({
@@ -64,6 +66,8 @@ export function TemplateForm({
   const [category, setCategory] = useState<Category | "">(existing?.category ?? "Loyalty");
   const [handle, setHandle] = useState<Handle | "">(existing?.handle ?? "Merchant");
   const [requestedMid, setRequestedMid] = useState(existing?.requestedMid ?? "");
+  const [name, setName] = useState(existing?.name ?? "");
+  const [eventId, setEventId] = useState(existing?.eventId ?? "");
   const [messageText, setMessageText] = useState(existing?.messageText ?? "");
   const messageTextRef = useRef<HTMLTextAreaElement>(null);
   const variables = variablesForCategory(category);
@@ -79,6 +83,8 @@ export function TemplateForm({
       setCategory("Loyalty");
       setHandle("Merchant");
       setRequestedMid("");
+      setName("");
+      setEventId("");
       setMessageText("");
     }
   }
@@ -187,6 +193,35 @@ export function TemplateForm({
                 <SelectItem value="DotpeCRM">DotPe CRM</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="name" className="text-[13px] font-medium text-foreground">
+              Name
+            </Label>
+            <Input
+              id="name"
+              name="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. points_earned"
+              className="h-9 rounded-lg text-[13px]"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="eventId" className="text-[13px] font-medium text-foreground">
+              Event ID
+            </Label>
+            <Input
+              id="eventId"
+              name="eventId"
+              value={eventId}
+              onChange={(e) => setEventId(e.target.value)}
+              placeholder="Triggering event identifier"
+              className="h-9 rounded-lg text-[13px]"
+            />
           </div>
         </div>
 

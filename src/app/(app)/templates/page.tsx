@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { formatNumber } from "@/lib/format";
 import { TemplateForm } from "./template-form";
+import { TemplateImportDialog } from "./template-import-dialog";
 import { TemplatesFilter } from "./templates-filter";
 import { TemplatesTable } from "./templates-table";
 import type { TemplateRow } from "./templates-table";
@@ -21,6 +22,7 @@ export default async function TemplatesPage({
   const params = await searchParams;
   const session = await auth();
   const canEdit = canMutate(session?.user?.role);
+  const isAdmin = session?.user?.role === "ADMIN";
 
   const where: Prisma.TemplateWhereInput = {};
   if (params.channel === "SMS" || params.channel === "WhatsApp") {
@@ -52,11 +54,14 @@ export default async function TemplatesPage({
 
   const rows: TemplateRow[] = templates.map((t) => ({
     id: t.id,
+    name: t.name,
     channel: t.channel,
     dealType: t.dealType,
     category: t.category,
     handle: t.handle,
     requestedMid: t.requestedMid,
+    eventId: t.eventId,
+    isDefault: t.isDefault,
     messageText: t.messageText,
     createdAt: t.createdAt.toISOString(),
     approvals: t.approvals,
@@ -71,7 +76,10 @@ export default async function TemplatesPage({
           title="Message Templates"
           description="SMS and WhatsApp templates, with approval submissions once live on the provider."
         />
-        {canEdit ? <TemplateForm /> : null}
+        <div className="flex items-center gap-2">
+          {isAdmin ? <TemplateImportDialog /> : null}
+          {canEdit ? <TemplateForm /> : null}
+        </div>
       </div>
 
       <div className="mb-5">

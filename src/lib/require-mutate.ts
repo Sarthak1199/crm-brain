@@ -23,3 +23,13 @@ export async function requireAuthenticated() {
     throw new Error("You must be signed in to do this.");
   }
 }
+
+// Stricter than requireMutate: Admin only, no Manager. For actions that
+// bulk-write or replace data outright (e.g. the templates CSV/Excel
+// import) rather than editing one record at a time.
+export async function requireAdmin() {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    throw new Error("Admin access required.");
+  }
+}
