@@ -43,7 +43,7 @@ export default async function RequestsPage({
             dotpeMid: true,
             totalStores: true,
             closedBranches: true,
-            pendingPotential: true,
+            totalYearlyPotential: true,
           },
         },
       },
@@ -56,7 +56,7 @@ export default async function RequestsPage({
 
   const rows = requests.map((r) => ({
     ...serializeSupportRequest(r),
-    merchant: r.merchant ? { ...r.merchant, pendingPotential: Number(r.merchant.pendingPotential) } : null,
+    merchant: r.merchant ? { ...r.merchant, totalYearlyPotential: Number(r.merchant.totalYearlyPotential) } : null,
   }));
 
   const merchantOptions = merchants.map((m) => ({
@@ -69,19 +69,16 @@ export default async function RequestsPage({
   // merchant's footprint once, not once per request against it. A request
   // with no real merchant (a freshly-typed name) has no shared identity to
   // dedupe against, so it falls back to its own request id as the key —
-  // each such row counts on its own. Pending potential comes live off the
-  // merchant record (synced from the closures sheet), not a per-request
-  // snapshot, so it reflects the latest sync rather than what it was when
-  // the request was filed.
-  const perMerchant = new Map<string, { totalBranches: number; pendingPotential: number }>();
+  // each such row counts on its own.
+  const perMerchant = new Map<string, { totalBranches: number; totalPotential: number }>();
   for (const r of rows) {
     const key = r.merchantId ?? r.id;
     if (!perMerchant.has(key)) {
-      perMerchant.set(key, { totalBranches: r.totalBranches, pendingPotential: r.merchant?.pendingPotential ?? 0 });
+      perMerchant.set(key, { totalBranches: r.totalBranches, totalPotential: r.totalPotential });
     }
   }
   const totalBranches = Array.from(perMerchant.values()).reduce((a, r) => a + r.totalBranches, 0);
-  const pendingPotential = Array.from(perMerchant.values()).reduce((a, r) => a + r.pendingPotential, 0);
+  const pendingPotential = Array.from(perMerchant.values()).reduce((a, r) => a + r.totalPotential, 0);
 
   return (
     <div>

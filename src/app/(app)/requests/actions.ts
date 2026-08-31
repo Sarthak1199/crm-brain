@@ -18,6 +18,7 @@ type SharedFields = {
   merchantNameFreeText: string | null;
   type: "Bug" | "Feature";
   totalBranches: number;
+  totalPotential: number;
   productRemarks: string | null;
 };
 
@@ -26,6 +27,7 @@ function parseSharedFields(formData: FormData): { error: string } | { data: Shar
   const merchantName = formData.get("merchantName");
   const type = formData.get("type");
   const totalBranchesRaw = formData.get("totalBranches");
+  const totalPotentialRaw = formData.get("totalPotential");
   const productRemarks = formData.get("productRemarks");
 
   const hasMerchantId = typeof merchantId === "string" && merchantId.trim().length > 0;
@@ -42,6 +44,13 @@ function parseSharedFields(formData: FormData): { error: string } | { data: Shar
   if (!Number.isFinite(totalBranches) || totalBranches < 0) {
     return { error: "Total Loyalty Branches must be a non-negative number." } as const;
   }
+  // Manual, not sheet-derived: the closures sheet's pending-potential figure
+  // only exists for merchants that already have a closure entry there, so it
+  // reads as 0 for anything not yet closed — useless for most open asks.
+  const totalPotential = Number(totalPotentialRaw);
+  if (!Number.isFinite(totalPotential) || totalPotential < 0) {
+    return { error: "Pending potential must be a non-negative number." } as const;
+  }
 
   // The one intentionally optional field — no validation needed either way.
   const productRemarksTrimmed =
@@ -52,6 +61,7 @@ function parseSharedFields(formData: FormData): { error: string } | { data: Shar
     merchantNameFreeText: hasMerchantId ? null : (merchantName as string).trim(),
     type,
     totalBranches: Math.round(totalBranches),
+    totalPotential,
     productRemarks: productRemarksTrimmed,
   };
 
@@ -74,14 +84,17 @@ function parseFiles(formData: FormData): { error: string } | { data: File[] } {
   return { data: files } as const;
 }
 
-// One merchant, one shared branches/remarks — but each free-text
+// One merchant, one shared branches/potential/remarks — but each free-text
 // description in the repeatable list is its own individual ask, so it
 // becomes its own SupportRequest row (and its own count on the KPI card).
+// Used for both create (every description is a new row) and edit (the
+// first description updates the row being edited; any more become new
+// rows against the same merchant — see updateSupportRequest).
 //
 // Merchant is either an existing one (merchantId set by the combobox) or a
 // typed name for a merchant not yet in the Merchant table (merchantName) —
 // exactly one of the two is expected, not both.
-function parseMultiDescriptionFields(formData: FormData) {
+function parseDescriptionFields(formData: FormData) {
   const shared = parseSharedFields(formData);
   if ("error" in shared) return shared;
 
@@ -97,21 +110,6 @@ function parseMultiDescriptionFields(formData: FormData) {
   if ("error" in files) return files;
 
   return { data: { shared: shared.data, descriptions, files: files.data } } as const;
-}
-
-function parseEditFields(formData: FormData) {
-  const shared = parseSharedFields(formData);
-  if ("error" in shared) return shared;
-
-  const description = formData.get("description");
-  if (typeof description !== "string" || !description.trim()) {
-    return { error: "Description is required." } as const;
-  }
-
-  const files = parseFiles(formData);
-  if ("error" in files) return files;
-
-  return { data: { shared: shared.data, description: description.trim(), files: files.data } } as const;
 }
 
 // The client's `accept` attribute and the uploaded File's own .name/.type
@@ -188,22 +186,18 @@ export async function createSupportRequest(
   formData: FormData
 ): Promise<string | undefined> {
   await requireAuthenticated();
-  const parsed = parseMultiDescriptionFields(formData);
+  const parsed = parseDescriptionFields(formData);
   if ("error" in parsed) return parsed.error;
   const { shared, descriptions, files } = parsed.data;
 
-  // totalPotential is no longer entered by hand — it tracks the merchant's
-  // live pendingPotential (synced from the closures sheet) at write time.
-  let totalPotential = 0;
   if (shared.merchantId) {
     const merchant = await prisma.merchant.findUnique({ where: { id: shared.merchantId } });
     if (!merchant) return "Merchant not found.";
-    totalPotential = Number(merchant.pendingPotential);
   }
 
   for (const description of descriptions) {
     const created = await prisma.supportRequest.create({
-      data: { ...shared, description, totalPotential },
+      data: { ...shared, description },
     });
 
     if (files.length > 0) {
@@ -218,26 +212,30 @@ export async function createSupportRequest(
   return undefined;
 }
 
+// Edit reuses the same repeatable-descriptions field as create: the first
+// description updates the row being edited (matching prior behavior), and
+// any additional ones become brand-new SupportRequest rows against the same
+// merchant/branches/potential/remarks — letting the filer log more asks
+// for an already-known merchant without leaving the edit dialog. Newly
+// uploaded files are duplicated onto every new row, same as create; the
+// row being edited instead appends them to its own existing images.
 export async function updateSupportRequest(
   requestId: string,
   _prevState: string | undefined,
   formData: FormData
 ): Promise<string | undefined> {
   await requireMutate();
-  const parsed = parseEditFields(formData);
+  const parsed = parseDescriptionFields(formData);
   if ("error" in parsed) return parsed.error;
-  const { shared, description, files } = parsed.data;
+  const { shared, descriptions, files } = parsed.data;
+  const [primaryDescription, ...extraDescriptions] = descriptions;
 
   const existing = await prisma.supportRequest.findUnique({ where: { id: requestId } });
   if (!existing) return "Request not found.";
 
-  // Same live-tracking as create — re-synced on every save, in case the
-  // merchant changed or the sheet's pending potential moved since filing.
-  let totalPotential = 0;
   if (shared.merchantId) {
     const merchant = await prisma.merchant.findUnique({ where: { id: shared.merchantId } });
     if (!merchant) return "Merchant not found.";
-    totalPotential = Number(merchant.pendingPotential);
   }
 
   const newFiles = files.length > 0 ? await saveFiles(requestId, files) : [];
@@ -247,11 +245,19 @@ export async function updateSupportRequest(
     where: { id: requestId },
     data: {
       ...shared,
-      description,
-      totalPotential,
+      description: primaryDescription,
       ...(newFiles.length > 0 ? { images: [...existingImages, ...newFiles] } : {}),
     },
   });
+
+  for (const description of extraDescriptions) {
+    const created = await prisma.supportRequest.create({
+      data: { ...shared, description },
+    });
+    if (newFiles.length > 0) {
+      await prisma.supportRequest.update({ where: { id: created.id }, data: { images: newFiles } });
+    }
+  }
 
   revalidatePath("/requests");
   return undefined;

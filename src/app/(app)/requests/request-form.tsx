@@ -27,6 +27,7 @@ export type ExistingRequest = {
   type: "Bug" | "Feature";
   description: string;
   totalBranches: number;
+  totalPotential: number;
   productRemarks: string | null;
   images: string[];
 };
@@ -69,6 +70,7 @@ export function RequestForm({
   const [merchantName, setMerchantName] = useState<string | null>(existing?.merchantNameFreeText ?? null);
   const [type, setType] = useState<"Bug" | "Feature" | "">(existing?.type ?? "");
   const [totalBranches, setTotalBranches] = useState(existing?.totalBranches?.toString() ?? "");
+  const [totalPotential, setTotalPotential] = useState(existing?.totalPotential?.toString() ?? "");
   const [descriptions, setDescriptions] = useState<DescriptionField[]>(() =>
     isEdit ? [{ key: "existing", value: existing.description }] : [emptyField()]
   );
@@ -87,6 +89,7 @@ export function RequestForm({
       setMerchantName(null);
       setType("");
       setTotalBranches("");
+      setTotalPotential("");
       setDescriptions([emptyField()]);
     }
     previews.forEach((p) => p.url && URL.revokeObjectURL(p.url));
@@ -160,7 +163,7 @@ export function RequestForm({
         <DialogTitle>{isEdit ? "Edit request" : "New bug or feature request"}</DialogTitle>
         <DialogDescription>
           {isEdit
-            ? "Update any field — branches and remarks are manual, so adjust as needed."
+            ? "Update any field — the first description updates this request; add more to log additional asks for the same merchant."
             : "Logged against one merchant. Add a description per individual ask — each becomes its own request."}
         </DialogDescription>
       </DialogHeader>
@@ -198,21 +201,39 @@ export function RequestForm({
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="totalBranches" className="text-[13px] font-medium text-foreground">
-            Total Loyalty Branches
-          </Label>
-          <Input
-            id="totalBranches"
-            name="totalBranches"
-            type="number"
-            min={0}
-            value={totalBranches}
-            onChange={(e) => setTotalBranches(e.target.value)}
-            placeholder={selectedMerchant ? String(selectedMerchant.totalStores) : "0"}
-            required
-            className="h-9 rounded-lg text-[13px]"
-          />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="totalBranches" className="text-[13px] font-medium text-foreground">
+              Total Loyalty Branches
+            </Label>
+            <Input
+              id="totalBranches"
+              name="totalBranches"
+              type="number"
+              min={0}
+              value={totalBranches}
+              onChange={(e) => setTotalBranches(e.target.value)}
+              placeholder={selectedMerchant ? String(selectedMerchant.totalStores) : "0"}
+              required
+              className="h-9 rounded-lg text-[13px]"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="totalPotential" className="text-[13px] font-medium text-foreground">
+              Pending potential (₹)
+            </Label>
+            <Input
+              id="totalPotential"
+              name="totalPotential"
+              type="number"
+              min={0}
+              value={totalPotential}
+              onChange={(e) => setTotalPotential(e.target.value)}
+              placeholder="0"
+              required
+              className="h-9 rounded-lg text-[13px]"
+            />
+          </div>
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -230,7 +251,7 @@ export function RequestForm({
 
         <div className="flex flex-col gap-2">
           <Label className="text-[13px] font-medium text-foreground">
-            {isEdit ? "Description" : "Descriptions (one per request)"}
+            {isEdit ? "Descriptions" : "Descriptions (one per request)"}
           </Label>
           {descriptions.map((d, i) => (
             <div key={d.key} className="flex items-start gap-2">
@@ -238,12 +259,16 @@ export function RequestForm({
                 name="description"
                 value={d.value}
                 onChange={(e) => updateDescription(d.key, e.target.value)}
-                placeholder={`What's the issue or ask${descriptions.length > 1 ? ` #${i + 1}` : ""}?`}
+                placeholder={
+                  isEdit && i === 0
+                    ? "What's the issue or ask?"
+                    : `What's the issue or ask${descriptions.length > 1 ? ` #${i + 1}` : ""}?`
+                }
                 rows={3}
                 required
                 className="rounded-lg text-[13px]"
               />
-              {!isEdit && descriptions.length > 1 ? (
+              {descriptions.length > 1 ? (
                 <button
                   type="button"
                   onClick={() => removeDescription(d.key)}
@@ -254,17 +279,15 @@ export function RequestForm({
               ) : null}
             </div>
           ))}
-          {!isEdit ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={addDescription}
-              className="h-8 w-fit gap-1.5 rounded-lg text-[12px]"
-            >
-              <Plus className="size-3.5" />
-              Add another request
-            </Button>
-          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={addDescription}
+            className="h-8 w-fit gap-1.5 rounded-lg text-[12px]"
+          >
+            <Plus className="size-3.5" />
+            Add another request
+          </Button>
         </div>
 
         <div className="flex flex-col gap-1.5">

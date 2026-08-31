@@ -27,7 +27,7 @@ export type RequestRow = SerializedSupportRequest & {
     dotpeMid: string;
     totalStores: number;
     closedBranches: number;
-    pendingPotential: number;
+    totalYearlyPotential: number;
   } | null;
 };
 
@@ -50,7 +50,8 @@ const ACCESSORS = {
   type: (r: RequestRow) => r.type,
   totalBranches: (r: RequestRow) => r.totalBranches,
   closurePercent: (r: RequestRow) => closurePercent(r),
-  pendingPotential: (r: RequestRow) => r.merchant?.pendingPotential ?? null,
+  merchantPotential: (r: RequestRow) => r.merchant?.totalYearlyPotential ?? null,
+  totalPotential: (r: RequestRow) => r.totalPotential,
   createdAt: (r: RequestRow) => new Date(r.createdAt),
 };
 
@@ -102,14 +103,15 @@ export function RequestsTable({
             </TableHead>
             <SortableHead label="Total Loyalty Branches" sortKey="totalBranches" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
             <SortableHead label="% Closed" sortKey="closurePercent" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
-            <SortableHead label="Pending Potential" sortKey="pendingPotential" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+            <SortableHead label="Total Potential" sortKey="merchantPotential" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+            <SortableHead label="Pending Potential" sortKey="totalPotential" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
             <SortableHead label="Created" sortKey="createdAt" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {sorted.length === 0 ? (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={9} className="py-12 text-center text-[13px] text-muted-foreground">
+              <TableCell colSpan={10} className="py-12 text-center text-[13px] text-muted-foreground">
                 No requests yet.
               </TableCell>
             </TableRow>
@@ -152,7 +154,10 @@ export function RequestsTable({
                   {formatPercent(closurePercent(row))}
                 </TableCell>
                 <TableCell className="px-4 py-3.5 text-right text-[13px] text-foreground">
-                  {row.merchant ? formatInr(row.merchant.pendingPotential, { compact: true }) : "—"}
+                  {row.merchant ? formatInr(row.merchant.totalYearlyPotential, { compact: true }) : "—"}
+                </TableCell>
+                <TableCell className="px-4 py-3.5 text-right text-[13px] text-foreground">
+                  {formatInr(row.totalPotential, { compact: true })}
                 </TableCell>
                 <TableCell className="px-4 py-3.5 text-right text-[13px] text-muted-foreground">
                   {formatDate(row.createdAt)}

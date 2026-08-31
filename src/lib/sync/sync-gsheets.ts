@@ -83,8 +83,6 @@ export async function syncCrmActiveSheet() {
  * counts, and the *authoritative* yearly potential figure (ops-maintained,
  * takes priority over the activeDineInStores × 10000 formula). "Payment
  * collected" also doubles as subscriptionRevenue — same underlying figure.
- * "Pending potential closure" feeds pendingPotential, the live per-merchant
- * figure the Requests listing shows instead of a per-request manual entry.
  */
 export async function syncCrmLoyaltyClosuresSheet() {
   const source = GSHEET_SOURCES.crmLoyaltyClosures;
@@ -110,8 +108,6 @@ export async function syncCrmLoyaltyClosuresSheet() {
     pendingBranches?: number;
     closedBranches?: number;
     totalYearlyPotential?: number;
-    pendingPotentialSum: number;
-    hasPendingPotential: boolean;
     loyaltyStatus?: "Active" | "Inactive";
     crmActivationConfirmed: boolean;
   };
@@ -131,7 +127,6 @@ export async function syncCrmLoyaltyClosuresSheet() {
     const pendingBranches = parseInt_(pick(row, "pending outlet closure"));
     const closedBranches = parseInt_(pick(row, "outlet closed"));
     const totalYearlyPotential = parseAmount(pick(row, "total potential closure yearly"));
-    const pendingPotential = parseAmount(pick(row, "pending potential closure"));
     const loyaltyStatus = parseYesNo(pick(row, "loyalty activation status"));
     // Explicit boolean, not optional: absence/"No" in this sheet must be able
     // to revoke a previously-confirmed value, not just leave it alone. This
@@ -150,8 +145,6 @@ export async function syncCrmLoyaltyClosuresSheet() {
       pendingBranches: pendingBranches ?? existingGroup?.pendingBranches,
       closedBranches: closedBranches ?? existingGroup?.closedBranches,
       totalYearlyPotential: totalYearlyPotential ?? existingGroup?.totalYearlyPotential,
-      pendingPotentialSum: (existingGroup?.pendingPotentialSum ?? 0) + (pendingPotential ?? 0),
-      hasPendingPotential: (existingGroup?.hasPendingPotential ?? false) || pendingPotential !== undefined,
       loyaltyStatus: loyaltyStatus ?? existingGroup?.loyaltyStatus,
       // A later row's explicit confirmation should win, but don't let a
       // blank/"No" later row silently revoke an earlier row's "Yes".
@@ -176,7 +169,6 @@ export async function syncCrmLoyaltyClosuresSheet() {
       ...(g.pendingBranches !== undefined ? { pendingBranches: g.pendingBranches } : {}),
       ...(g.closedBranches !== undefined ? { closedBranches: g.closedBranches } : {}),
       ...(g.totalYearlyPotential !== undefined ? { totalYearlyPotential: g.totalYearlyPotential } : {}),
-      ...(g.hasPendingPotential ? { pendingPotential: g.pendingPotentialSum } : {}),
       ...(g.loyaltyStatus ? { loyaltyStatus: g.loyaltyStatus } : {}),
       crmActivationConfirmed: g.crmActivationConfirmed,
     };

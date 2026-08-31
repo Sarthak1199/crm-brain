@@ -117,9 +117,10 @@ export function RequestDetailSheet({
                     )}
                   />
                   <Field
-                    label="Pending Potential"
-                    value={row.merchant ? formatInr(row.merchant.pendingPotential) : "—"}
+                    label="Total Potential"
+                    value={row.merchant ? formatInr(row.merchant.totalYearlyPotential) : "—"}
                   />
+                  <Field label="Pending Potential" value={formatInr(row.totalPotential)} />
                 </Section>
 
                 <Section title="Description">
@@ -186,6 +187,7 @@ export function RequestDetailSheet({
             type: row.type,
             description: row.description,
             totalBranches: row.totalBranches,
+            totalPotential: row.totalPotential,
             productRemarks: row.productRemarks,
             images: row.images,
           }}
