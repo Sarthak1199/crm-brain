@@ -1,8 +1,6 @@
 "use server";
 
-import { mkdir, rm, writeFile } from "fs/promises";
-import path from "path";
-import { randomUUID } from "crypto";
+import { put, del } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireMutate, requireAuthenticated } from "@/lib/require-mutate";
@@ -24,14 +22,7 @@ type SharedFields = {
   productRemarks: string | null;
 };
 
-// One merchant, one shared branches/potential/remarks — but each free-text
-// description in the repeatable list is its own individual ask, so it
-// becomes its own SupportRequest row (and its own count on the KPI card).
-//
-// Merchant is either an existing one (merchantId set by the combobox) or a
-// typed name for a merchant not yet in the Merchant table (merchantName) —
-// exactly one of the two is expected, not both.
-function parseMultiDescriptionFields(formData: FormData) {
+function parseSharedFields(formData: FormData): { error: string } | { data: SharedFields } {
   const merchantId = formData.get("merchantId");
   const merchantName = formData.get("merchantName");
   const type = formData.get("type");
@@ -58,22 +49,24 @@ function parseMultiDescriptionFields(formData: FormData) {
     return { error: "Total potential must be a non-negative number." } as const;
   }
 
-  const descriptions = formData
-    .getAll("description")
-    .filter((d): d is string => typeof d === "string" && !!d.trim())
-    .map((d) => d.trim());
-  if (descriptions.length === 0) {
-    return { error: "Add at least one description." } as const;
-  }
-
   // The one intentionally optional field — no validation needed either way.
   const productRemarksTrimmed =
     typeof productRemarks === "string" && productRemarks.trim() ? productRemarks.trim() : null;
 
+  const shared: SharedFields = {
+    merchantId: hasMerchantId ? (merchantId as string).trim() : null,
+    merchantNameFreeText: hasMerchantId ? null : (merchantName as string).trim(),
+    type,
+    totalBranches: Math.round(totalBranches),
+    totalPotential,
+    productRemarks: productRemarksTrimmed,
+  };
+
+  return { data: shared } as const;
+}
+
+function parseFiles(formData: FormData): { error: string } | { data: File[] } {
   const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
-  if (files.length === 0) {
-    return { error: "Attach at least one file." } as const;
-  }
   if (files.length > MAX_FILES) {
     return { error: `Attach at most ${MAX_FILES} files.` } as const;
   }
@@ -85,27 +78,57 @@ function parseMultiDescriptionFields(formData: FormData) {
   if (oversizeFile) {
     return { error: `"${oversizeFile.name}" is too large (max ${Math.floor(MAX_FILE_SIZE / (1024 * 1024))}MB per file).` } as const;
   }
+  return { data: files } as const;
+}
 
-  const shared: SharedFields = {
-    merchantId: hasMerchantId ? (merchantId as string).trim() : null,
-    merchantNameFreeText: hasMerchantId ? null : (merchantName as string).trim(),
-    type,
-    totalBranches: Math.round(totalBranches),
-    totalPotential,
-    productRemarks: productRemarksTrimmed,
-  };
+// One merchant, one shared branches/potential/remarks — but each free-text
+// description in the repeatable list is its own individual ask, so it
+// becomes its own SupportRequest row (and its own count on the KPI card).
+//
+// Merchant is either an existing one (merchantId set by the combobox) or a
+// typed name for a merchant not yet in the Merchant table (merchantName) —
+// exactly one of the two is expected, not both.
+function parseMultiDescriptionFields(formData: FormData) {
+  const shared = parseSharedFields(formData);
+  if ("error" in shared) return shared;
 
-  return { data: { shared, descriptions } } as const;
+  const descriptions = formData
+    .getAll("description")
+    .filter((d): d is string => typeof d === "string" && !!d.trim())
+    .map((d) => d.trim());
+  if (descriptions.length === 0) {
+    return { error: "Add at least one description." } as const;
+  }
+
+  const files = parseFiles(formData);
+  if ("error" in files) return files;
+
+  return { data: { shared: shared.data, descriptions, files: files.data } } as const;
+}
+
+function parseEditFields(formData: FormData) {
+  const shared = parseSharedFields(formData);
+  if ("error" in shared) return shared;
+
+  const description = formData.get("description");
+  if (typeof description !== "string" || !description.trim()) {
+    return { error: "Description is required." } as const;
+  }
+
+  const files = parseFiles(formData);
+  if ("error" in files) return files;
+
+  return { data: { shared: shared.data, description: description.trim(), files: files.data } } as const;
 }
 
 // The client's `accept` attribute and the uploaded File's own .name/.type
 // are both attacker-controlled hints, not proof — a request built by hand
 // could upload anything. Sniff the actual file signature and derive the
 // saved extension from that, so a renamed file (e.g. .html, which the
-// browser would execute if ever opened directly from /uploads) can't reach
-// disk with a trusted-looking extension. CSV has no reliable magic bytes —
-// it's plain text — so it's the one type allowed through on extension
-// alone, guarded by a check that the content doesn't look like markup.
+// browser would execute if ever opened directly) can't reach storage with
+// a trusted-looking extension. CSV has no reliable magic bytes — it's
+// plain text — so it's the one type allowed through on extension alone,
+// guarded by a check that the content doesn't look like markup.
 const FILE_SIGNATURES: { ext: string; matches: (b: Buffer) => boolean }[] = [
   { ext: ".jpg", matches: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
   {
@@ -146,22 +169,23 @@ function detectFileExtension(buffer: Buffer, originalName: string): string | nul
   return null;
 }
 
-async function saveFiles(requestId: string, formData: FormData): Promise<string[]> {
-  const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
-  if (files.length === 0) return [];
-
-  const dir = path.join(process.cwd(), "public", "uploads", "requests", requestId);
-  await mkdir(dir, { recursive: true });
-
+// Vercel's serverless filesystem is ephemeral and `public/` is served from
+// an immutable build-time snapshot — files written there at runtime via
+// fs.writeFile are never actually reachable, which is why uploaded media
+// was invisible. Vercel Blob gives each file a real, persistent, publicly
+// fetchable URL instead.
+async function saveFiles(requestId: string, files: File[]): Promise<string[]> {
   const paths: string[] = [];
   for (const file of files.slice(0, MAX_FILES)) {
     if (file.size > MAX_FILE_SIZE) continue;
     const buffer = Buffer.from(await file.arrayBuffer());
     const ext = detectFileExtension(buffer, file.name);
     if (!ext) continue; // not a recognized type by content — skip silently
-    const safeName = `${randomUUID()}${ext}`;
-    await writeFile(path.join(dir, safeName), buffer);
-    paths.push(`/uploads/requests/${requestId}/${safeName}`);
+    const blob = await put(`requests/${requestId}/${crypto.randomUUID()}${ext}`, buffer, {
+      access: "public",
+      addRandomSuffix: false,
+    });
+    paths.push(blob.url);
   }
   return paths;
 }
@@ -173,7 +197,7 @@ export async function createSupportRequest(
   await requireAuthenticated();
   const parsed = parseMultiDescriptionFields(formData);
   if ("error" in parsed) return parsed.error;
-  const { shared, descriptions } = parsed.data;
+  const { shared, descriptions, files } = parsed.data;
 
   if (shared.merchantId) {
     const merchant = await prisma.merchant.findUnique({ where: { id: shared.merchantId } });
@@ -185,17 +209,47 @@ export async function createSupportRequest(
       data: { ...shared, description },
     });
 
-    const newFiles = await saveFiles(created.id, formData);
-    if (newFiles.length === 0) {
-      // Every file failed content sniffing (or was silently dropped for
-      // size) — the request is still created (its own description is real
-      // and shouldn't be lost), but a request with 0 saved files despite
-      // the field being required would be a confusing dead end otherwise.
-      await prisma.supportRequest.delete({ where: { id: created.id } });
-      return "None of the attached files could be saved — check the file type and try again.";
+    if (files.length > 0) {
+      const savedFiles = await saveFiles(created.id, files);
+      if (savedFiles.length > 0) {
+        await prisma.supportRequest.update({ where: { id: created.id }, data: { images: savedFiles } });
+      }
     }
-    await prisma.supportRequest.update({ where: { id: created.id }, data: { images: newFiles } });
   }
+
+  revalidatePath("/requests");
+  return undefined;
+}
+
+export async function updateSupportRequest(
+  requestId: string,
+  _prevState: string | undefined,
+  formData: FormData
+): Promise<string | undefined> {
+  await requireMutate();
+  const parsed = parseEditFields(formData);
+  if ("error" in parsed) return parsed.error;
+  const { shared, description, files } = parsed.data;
+
+  const existing = await prisma.supportRequest.findUnique({ where: { id: requestId } });
+  if (!existing) return "Request not found.";
+
+  if (shared.merchantId) {
+    const merchant = await prisma.merchant.findUnique({ where: { id: shared.merchantId } });
+    if (!merchant) return "Merchant not found.";
+  }
+
+  const newFiles = files.length > 0 ? await saveFiles(requestId, files) : [];
+  const existingImages = Array.isArray(existing.images) ? (existing.images as string[]) : [];
+
+  await prisma.supportRequest.update({
+    where: { id: requestId },
+    data: {
+      ...shared,
+      description,
+      ...(newFiles.length > 0 ? { images: [...existingImages, ...newFiles] } : {}),
+    },
+  });
 
   revalidatePath("/requests");
   return undefined;
@@ -203,8 +257,17 @@ export async function createSupportRequest(
 
 export async function deleteSupportRequest(requestId: string): Promise<void> {
   await requireMutate();
-  const dir = path.join(process.cwd(), "public", "uploads", "requests", requestId);
+  const existing = await prisma.supportRequest.findUnique({ where: { id: requestId }, select: { images: true } });
   await prisma.supportRequest.delete({ where: { id: requestId } });
-  await rm(dir, { recursive: true, force: true });
+
+  const images = Array.isArray(existing?.images) ? (existing.images as string[]) : [];
+  if (images.length > 0) {
+    try {
+      await del(images);
+    } catch (error) {
+      console.error(`deleteSupportRequest: failed to delete blobs for ${requestId}`, error);
+    }
+  }
+
   revalidatePath("/requests");
 }

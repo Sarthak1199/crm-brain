@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -7,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import { SortableHead } from "@/components/sortable-head";
 import { StatusBadge } from "@/components/status-badge";
 import { formatNumber } from "@/lib/format";
@@ -36,13 +39,29 @@ const ACCESSORS = {
 };
 
 export function OnboardingDetailsTable({ rows }: { rows: OnboardingMerchantRow[] }) {
-  const { sorted, sortKey, direction, toggleSort } = useSort(rows, ACCESSORS, {
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) => r.brandName.toLowerCase().includes(q));
+  }, [rows, query]);
+  const { sorted, sortKey, direction, toggleSort } = useSort(filtered, ACCESSORS, {
     key: "brandName",
     direction: "asc",
   });
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card">
+    <div>
+      <div className="relative mb-3 max-w-xs">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search merchant name..."
+          className="h-9 rounded-lg pl-8 text-[13px]"
+        />
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-border bg-card">
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -60,7 +79,7 @@ export function OnboardingDetailsTable({ rows }: { rows: OnboardingMerchantRow[]
           {sorted.length === 0 ? (
             <TableRow className="hover:bg-transparent">
               <TableCell colSpan={8} className="py-12 text-center text-[13px] text-muted-foreground">
-                No merchants yet.
+                {rows.length === 0 ? "No merchants yet." : "No merchants match that search."}
               </TableCell>
             </TableRow>
           ) : (
@@ -93,6 +112,7 @@ export function OnboardingDetailsTable({ rows }: { rows: OnboardingMerchantRow[]
           )}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }

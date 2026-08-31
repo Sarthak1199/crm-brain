@@ -52,11 +52,15 @@ function TypeBadge({ type }: { type: string }) {
   );
 }
 
+type MerchantOption = { id: string; brandName: string; totalStores: number; totalYearlyPotential: number };
+
 export function RequestsTable({
   rows,
+  merchants,
   canEdit,
 }: {
   rows: RequestRow[];
+  merchants: MerchantOption[];
   canEdit: boolean;
 }) {
   const [selected, setSelected] = useState<RequestRow | null>(null);
@@ -140,6 +144,7 @@ export function RequestsTable({
 
       <RequestDetailSheet
         row={selected}
+        merchants={merchants}
         canEdit={canEdit}
         onOpenChange={(open) => !open && setSelected(null)}
       />

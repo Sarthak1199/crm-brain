@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { Check } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -10,7 +11,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { SortableHead } from "@/components/sortable-head";
 import { formatDate } from "@/lib/format";
 import { useSort } from "@/hooks/use-sort";
@@ -18,8 +18,7 @@ import { cn } from "@/lib/utils";
 import { TemplateDetailSheet } from "./template-detail-sheet";
 import { HANDLE_LABELS } from "./template-form";
 import type { Channel, Category, DealType, Handle } from "./template-form";
-import type { ApprovalStatus, ExistingApproval } from "./approval-form";
-import { setTemplateDefault } from "./actions";
+import type { ExistingApproval } from "./approval-form";
 
 export type ApprovalRow = ExistingApproval;
 
@@ -35,6 +34,8 @@ export type TemplateRow = {
   isDefault: boolean;
   messageText: string;
   createdAt: string;
+  // Still shown/managed in the detail sheet — only dropped from this list
+  // view, not removed from the data model.
   approvals: ApprovalRow[];
 };
 
@@ -46,28 +47,8 @@ const ACCESSORS = {
   handle: (r: TemplateRow) => (r.handle ? HANDLE_LABELS[r.handle] : ""),
   eventId: (r: TemplateRow) => r.eventId ?? "",
   isDefault: (r: TemplateRow) => (r.isDefault ? 1 : 0),
-  approvals: (r: TemplateRow) => r.approvals.length,
   createdAt: (r: TemplateRow) => new Date(r.createdAt),
 };
-
-function DefaultToggle({ row, canEdit }: { row: TemplateRow; canEdit: boolean }) {
-  const [checked, setChecked] = useState(row.isDefault);
-  const [isPending, startTransition] = useTransition();
-
-  return (
-    <Switch
-      checked={checked}
-      disabled={!canEdit || isPending}
-      onClick={(e) => e.stopPropagation()}
-      onCheckedChange={(next) => {
-        setChecked(next);
-        startTransition(async () => {
-          await setTemplateDefault(row.id, next);
-        });
-      }}
-    />
-  );
-}
 
 function ChannelBadge({ channel }: { channel: Channel }) {
   return (
@@ -82,12 +63,6 @@ function ChannelBadge({ channel }: { channel: Channel }) {
       {channel}
     </span>
   );
-}
-
-function bestApprovalStatus(approvals: ApprovalRow[]): ApprovalStatus | null {
-  if (approvals.some((a) => a.approvalStatus === "Approved")) return "Approved";
-  if (approvals.length > 0) return "Submitted";
-  return null;
 }
 
 export function TemplatesTable({ rows, canEdit }: { rows: TemplateRow[]; canEdit: boolean }) {
@@ -118,74 +93,61 @@ export function TemplatesTable({ rows, canEdit }: { rows: TemplateRow[]; canEdit
             </TableHead>
             <SortableHead label="Event ID" sortKey="eventId" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Default" sortKey="isDefault" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
-            <SortableHead label="Approval" sortKey="approvals" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Created" sortKey="createdAt" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {sorted.length === 0 ? (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={10} className="py-12 text-center text-[13px] text-muted-foreground">
+              <TableCell colSpan={9} className="py-12 text-center text-[13px] text-muted-foreground">
                 No templates yet.
               </TableCell>
             </TableRow>
           ) : (
-            sorted.map((row) => {
-              const status = bestApprovalStatus(row.approvals);
-              return (
-                <TableRow key={row.id} onClick={() => setSelectedId(row.id)} className="cursor-pointer">
-                  <TableCell className="px-4 py-3.5 text-[13px] font-medium text-foreground">
-                    {row.name ?? <span className="text-[12px] font-normal text-muted-foreground/60">—</span>}
-                  </TableCell>
-                  <TableCell className="px-4 py-3.5">
-                    <ChannelBadge channel={row.channel} />
-                  </TableCell>
-                  <TableCell className="px-4 py-3.5 text-[13px] text-foreground">
-                    {row.dealType === "WithDeal" ? "With Deal" : "Without Deal"}
-                  </TableCell>
-                  <TableCell className="px-4 py-3.5">
-                    {row.category ? (
-                      <Badge variant="outline" className="text-[11px]">
-                        {row.category}
-                      </Badge>
-                    ) : (
-                      <span className="text-[12px] text-muted-foreground/60">Uncategorized</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="px-4 py-3.5 text-[13px] text-foreground">
-                    {row.handle ? HANDLE_LABELS[row.handle] : <span className="text-[12px] text-muted-foreground/60">—</span>}
-                  </TableCell>
-                  <TableCell className="max-w-sm px-4 py-3.5 text-[13px] text-foreground">
-                    <p className="truncate">{row.messageText}</p>
-                  </TableCell>
-                  <TableCell className="px-4 py-3.5 text-[13px] text-muted-foreground">
-                    {row.eventId ?? "—"}
-                  </TableCell>
-                  <TableCell className="px-4 py-3.5">
-                    <DefaultToggle row={row} canEdit={canEdit} />
-                  </TableCell>
-                  <TableCell className="px-4 py-3.5">
-                    {status ? (
-                      <Badge
-                        variant="outline"
-                        className={
-                          status === "Approved"
-                            ? "border-positive/20 bg-positive/10 text-[11px] text-positive-foreground"
-                            : "text-[11px] text-muted-foreground"
-                        }
-                      >
-                        {status}
-                      </Badge>
-                    ) : (
-                      <span className="text-[12px] text-muted-foreground/60">None</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="px-4 py-3.5 text-right text-[13px] text-muted-foreground">
-                    {formatDate(row.createdAt)}
-                  </TableCell>
-                </TableRow>
-              );
-            })
+            sorted.map((row) => (
+              <TableRow key={row.id} onClick={() => setSelectedId(row.id)} className="cursor-pointer">
+                <TableCell className="px-4 py-3.5 text-[13px] font-medium text-foreground">
+                  {row.name ?? <span className="text-[12px] font-normal text-muted-foreground/60">—</span>}
+                </TableCell>
+                <TableCell className="px-4 py-3.5">
+                  <ChannelBadge channel={row.channel} />
+                </TableCell>
+                <TableCell className="px-4 py-3.5 text-[13px] text-foreground">
+                  {row.dealType === "WithDeal" ? "With Deal" : "Without Deal"}
+                </TableCell>
+                <TableCell className="px-4 py-3.5">
+                  {row.category ? (
+                    <Badge variant="outline" className="text-[11px]">
+                      {row.category}
+                    </Badge>
+                  ) : (
+                    <span className="text-[12px] text-muted-foreground/60">Uncategorized</span>
+                  )}
+                </TableCell>
+                <TableCell className="px-4 py-3.5 text-[13px] text-foreground">
+                  {row.handle ? HANDLE_LABELS[row.handle] : <span className="text-[12px] text-muted-foreground/60">—</span>}
+                </TableCell>
+                <TableCell className="max-w-sm px-4 py-3.5 text-[13px] text-foreground">
+                  <p className="truncate">{row.messageText}</p>
+                </TableCell>
+                <TableCell className="px-4 py-3.5 text-[13px] text-muted-foreground">
+                  {row.eventId ?? "—"}
+                </TableCell>
+                <TableCell className="px-4 py-3.5">
+                  {row.isDefault ? (
+                    <span className="inline-flex items-center gap-1 text-[12px] font-medium text-positive-foreground">
+                      <Check className="size-3.5" />
+                      Default
+                    </span>
+                  ) : (
+                    <span className="text-[12px] text-muted-foreground/60">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="px-4 py-3.5 text-right text-[13px] text-muted-foreground">
+                  {formatDate(row.createdAt)}
+                </TableCell>
+              </TableRow>
+            ))
           )}
         </TableBody>
       </Table>

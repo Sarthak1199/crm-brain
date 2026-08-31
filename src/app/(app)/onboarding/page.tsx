@@ -3,6 +3,8 @@ import { auth } from "@/auth";
 import { canMutate } from "@/lib/authz";
 import { PageHeader } from "@/components/page-header";
 import { SyncStatusBar } from "@/components/sync-status-bar";
+import { REDASH_SOURCE_LINKS, GSHEET_SOURCE_LINKS } from "@/lib/sync/source-links";
+import { REDASH_QUERY_IDS } from "@/lib/sync/redash-query-ids";
 import { OnboardingForm } from "./onboarding-form";
 import { OnboardingKpis } from "./onboarding-kpis";
 import { OnboardingDetailsTable } from "./onboarding-details-table";
@@ -101,7 +103,39 @@ export default async function OnboardingPage() {
         />
       </div>
 
-      <h2 className="mb-3 text-[16px] font-semibold text-foreground">Licenses</h2>
+      <h2 className="mb-1 text-[16px] font-semibold text-foreground">Licenses</h2>
+      <p className="mb-3 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted-foreground/70">
+        <span>Source:</span>
+        <a
+          href={REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.mxGrain].url}
+          target="_blank"
+          rel="noreferrer"
+          className="underline decoration-dotted underline-offset-2 hover:text-muted-foreground"
+        >
+          Redash: DotPe Grain
+        </a>
+        <span>(Rista, DotPe, WABA)</span>
+        <span>·</span>
+        <a
+          href={REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.crmAdoption].url}
+          target="_blank"
+          rel="noreferrer"
+          className="underline decoration-dotted underline-offset-2 hover:text-muted-foreground"
+        >
+          Redash: CRM Overview Metrics
+        </a>
+        <span>(CRM License)</span>
+        <span>·</span>
+        <a
+          href={GSHEET_SOURCE_LINKS.loyaltyOnboarding.url}
+          target="_blank"
+          rel="noreferrer"
+          className="underline decoration-dotted underline-offset-2 hover:text-muted-foreground"
+        >
+          GSheet: Loyalty enable
+        </a>
+        <span>(Loyalty License)</span>
+      </p>
       <OnboardingDetailsTable rows={detailsRows} />
     </div>
   );

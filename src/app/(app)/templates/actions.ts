@@ -72,34 +72,6 @@ export async function updateTemplate(
   return undefined;
 }
 
-// Quick toggle from the list view. Enforced in a transaction rather than a
-// DB constraint (Prisma's schema DSL can't express a partial/conditional
-// unique index without dropping to raw SQL in the migration, and this
-// admin tool's write volume doesn't need that): turning a template's
-// isDefault on first clears it from every other template sharing the same
-// eventId, so at most one stays true per event.
-export async function setTemplateDefault(templateId: string, isDefault: boolean): Promise<string | undefined> {
-  await requireMutate();
-
-  const template = await prisma.template.findUnique({ where: { id: templateId }, select: { eventId: true } });
-  if (!template) return "Template not found.";
-
-  if (isDefault && template.eventId) {
-    await prisma.$transaction([
-      prisma.template.updateMany({
-        where: { eventId: template.eventId, id: { not: templateId } },
-        data: { isDefault: false },
-      }),
-      prisma.template.update({ where: { id: templateId }, data: { isDefault: true } }),
-    ]);
-  } else {
-    await prisma.template.update({ where: { id: templateId }, data: { isDefault } });
-  }
-
-  revalidatePath("/templates");
-  return undefined;
-}
-
 export async function deleteTemplate(templateId: string): Promise<void> {
   await requireMutate();
   await prisma.template.delete({ where: { id: templateId } });

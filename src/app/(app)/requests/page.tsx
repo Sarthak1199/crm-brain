@@ -93,7 +93,7 @@ export default async function RequestsPage({
         />
       </div>
 
-      <RequestsTable rows={rows} canEdit={canEdit} />
+      <RequestsTable rows={rows} merchants={merchantOptions} canEdit={canEdit} />
     </div>
   );
 }

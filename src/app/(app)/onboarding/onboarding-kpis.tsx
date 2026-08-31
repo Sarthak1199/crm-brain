@@ -50,6 +50,7 @@ export function OnboardingKpis({
         icon={Megaphone}
         label="Marketing License Enabled"
         value={formatNumber(marketingLicenseEnabled)}
+        sources={[REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.mxGrain]]}
       />
       <StatCard
         icon={CheckCircle2}
