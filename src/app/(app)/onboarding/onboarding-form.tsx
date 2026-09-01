@@ -96,15 +96,15 @@ function SectionLabel({ title }: { title: string }) {
 
 function Section({ title, tip, children }: { title: string; tip?: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3.5">
       <SectionLabel title={title} />
       {tip ? (
-        <div className="flex items-start gap-2 rounded-lg border border-[#1188EF]/25 bg-[#1188EF]/5 px-3 py-2.5 text-[12px] leading-relaxed text-foreground">
-          <Info className="mt-0.5 size-3.5 shrink-0 text-[#1188EF]" />
-          <span>{tip}</span>
+        <div className="flex items-center gap-2 rounded-lg border border-[#1188EF]/25 bg-[#1188EF]/5 px-3 py-2 text-[12px] leading-relaxed text-foreground">
+          <Info className="size-3.5 shrink-0 text-[#1188EF]" />
+          <span className="truncate">{tip}</span>
         </div>
       ) : null}
-      <div className="flex flex-col gap-6">{children}</div>
+      <div className="flex flex-col gap-4">{children}</div>
     </div>
   );
 }
@@ -157,7 +157,7 @@ function TextField({
         readOnly={readOnly}
         aria-invalid={!!error}
         className={cn(
-          "h-10 rounded-lg text-[13px]",
+          "h-9 rounded-lg text-[13px]",
           BRAND_FOCUS,
           readOnly && "bg-muted/50 text-muted-foreground",
           error && "border-negative"
@@ -287,8 +287,8 @@ export function OnboardingForm({ merchants, userEmail }: { merchants: MerchantOp
             New Request
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-[640px] gap-0 p-0">
-          <div className="border-b border-border px-6 py-5">
+        <DialogContent className="max-w-3xl gap-0 p-0 sm:max-w-3xl">
+          <div className="border-b border-border px-8 py-4">
             <DialogHeader className="gap-1">
               <DialogTitle className="text-[18px]">Loyalty / CRM license request</DialogTitle>
               <DialogDescription className="text-[13px]">
@@ -296,7 +296,7 @@ export function OnboardingForm({ merchants, userEmail }: { merchants: MerchantOp
                 Form.
               </DialogDescription>
             </DialogHeader>
-            <p className="mt-2 text-[12px] text-muted-foreground">
+            <p className="mt-1.5 text-[12px] text-muted-foreground">
               <span className="text-negative-foreground">*</span> All fields are mandatory except Additional
               Comments.
             </p>
@@ -306,118 +306,122 @@ export function OnboardingForm({ merchants, userEmail }: { merchants: MerchantOp
             ref={formRef}
             noValidate
             action={handleSubmit}
-            className="flex max-h-[70vh] flex-col gap-8 overflow-y-auto px-6 py-6"
+            className="flex max-h-[80vh] flex-col gap-5 overflow-y-auto px-8 py-5"
           >
             <Section title="Merchant Details">
-              <TextField id="email" label="Email address" required value={userEmail} readOnly />
+              <div className="grid grid-cols-2 gap-x-5 gap-y-4">
+                <TextField id="email" label="Email address" required value={userEmail} readOnly />
 
-              <div className="flex flex-col gap-1.5">
-                <RequiredLabel required>Business name</RequiredLabel>
-                <MerchantNameField
-                  id="businessName"
-                  name="businessName"
-                  merchants={merchants.map((m) => ({ id: m.id, brandName: m.brandName }))}
-                  value={values.businessName}
-                  onChange={(v) => setField("businessName", v)}
-                  onSelectMerchant={handleMerchantPick}
-                  onBlur={() => handleBlur("businessName")}
-                  placeholder="Type or search a merchant name..."
-                  className={cn(BRAND_FOCUS, fieldError("businessName") && "border-negative")}
+                <div className="flex flex-col gap-1.5">
+                  <RequiredLabel required>Business name</RequiredLabel>
+                  <MerchantNameField
+                    id="businessName"
+                    name="businessName"
+                    merchants={merchants.map((m) => ({ id: m.id, brandName: m.brandName }))}
+                    value={values.businessName}
+                    onChange={(v) => setField("businessName", v)}
+                    onSelectMerchant={handleMerchantPick}
+                    onBlur={() => handleBlur("businessName")}
+                    placeholder="Type or search a merchant name..."
+                    className={cn("h-9", BRAND_FOCUS, fieldError("businessName") && "border-negative")}
+                  />
+                  <FieldError message={fieldError("businessName")} />
+                </div>
+
+                <TextField
+                  id="enterpriseMerchantId"
+                  label="MerchantID (enterprise)"
+                  required
+                  value={values.enterpriseMerchantId}
+                  onChange={(v) => setField("enterpriseMerchantId", v)}
+                  onBlur={() => handleBlur("enterpriseMerchantId")}
+                  error={fieldError("enterpriseMerchantId")}
                 />
-                <FieldError message={fieldError("businessName")} />
+                <TextField
+                  id="ristaBusinessId"
+                  label="BusinessID (Rista)"
+                  required
+                  value={values.ristaBusinessId}
+                  onChange={(v) => setField("ristaBusinessId", v)}
+                  onBlur={() => handleBlur("ristaBusinessId")}
+                  error={fieldError("ristaBusinessId")}
+                />
+                <TextField
+                  id="ristaBrandId"
+                  label="BrandID (Rista)"
+                  required
+                  value={values.ristaBrandId}
+                  onChange={(v) => setField("ristaBrandId", v)}
+                  onBlur={() => handleBlur("ristaBrandId")}
+                  error={fieldError("ristaBrandId")}
+                />
+                <TextField
+                  id="ristaAccountNumber"
+                  label="Rista account number"
+                  required
+                  value={values.ristaAccountNumber}
+                  onChange={(v) => setField("ristaAccountNumber", v)}
+                  onBlur={() => handleBlur("ristaAccountNumber")}
+                  error={fieldError("ristaAccountNumber")}
+                />
               </div>
-
-              <TextField
-                id="enterpriseMerchantId"
-                label="MerchantID (enterprise)"
-                required
-                value={values.enterpriseMerchantId}
-                onChange={(v) => setField("enterpriseMerchantId", v)}
-                onBlur={() => handleBlur("enterpriseMerchantId")}
-                error={fieldError("enterpriseMerchantId")}
-              />
-              <TextField
-                id="ristaBusinessId"
-                label="BusinessID (Rista)"
-                required
-                value={values.ristaBusinessId}
-                onChange={(v) => setField("ristaBusinessId", v)}
-                onBlur={() => handleBlur("ristaBusinessId")}
-                error={fieldError("ristaBusinessId")}
-              />
-              <TextField
-                id="ristaBrandId"
-                label="BrandID (Rista)"
-                required
-                value={values.ristaBrandId}
-                onChange={(v) => setField("ristaBrandId", v)}
-                onBlur={() => handleBlur("ristaBrandId")}
-                error={fieldError("ristaBrandId")}
-              />
-              <TextField
-                id="ristaAccountNumber"
-                label="Rista account number"
-                required
-                value={values.ristaAccountNumber}
-                onChange={(v) => setField("ristaAccountNumber", v)}
-                onBlur={() => handleBlur("ristaAccountNumber")}
-                error={fieldError("ristaAccountNumber")}
-              />
             </Section>
 
             <Section
               title="Branch Whitelisting"
-              tip="Adding multiple branches? Enter comma-separated values (e.g. 1232, 1233, 1234) in Branch ID, Branch Code, Store Code and Store ID to whitelist them all in one submission."
+              tip="Whitelisting multiple branches? Comma-separate values, e.g. 1232, 1233, 1234."
             >
-              <TextField
-                id="ristaBranchId"
-                label="BranchID (Rista)"
-                required
-                value={values.ristaBranchId}
-                onChange={(v) => setField("ristaBranchId", v)}
-                onBlur={() => handleBlur("ristaBranchId")}
-                error={fieldError("ristaBranchId")}
-                placeholder="e.g. 1232, 1233, 1234"
-              />
-              <TextField
-                id="branchCode"
-                label="BranchCode"
-                required
-                value={values.branchCode}
-                onChange={(v) => setField("branchCode", v)}
-                onBlur={() => handleBlur("branchCode")}
-                error={fieldError("branchCode")}
-                placeholder="e.g. 1232, 1233, 1234"
-              />
-              <TextField
-                id="storeCode"
-                label="StoreCode"
-                required
-                value={values.storeCode}
-                onChange={(v) => setField("storeCode", v)}
-                onBlur={() => handleBlur("storeCode")}
-                error={fieldError("storeCode")}
-                placeholder="e.g. 1232, 1233, 1234"
-              />
-              <TextField
-                id="enterpriseStoreId"
-                label="StoreId (enterprise)"
-                required
-                value={values.enterpriseStoreId}
-                onChange={(v) => setField("enterpriseStoreId", v)}
-                onBlur={() => handleBlur("enterpriseStoreId")}
-                error={fieldError("enterpriseStoreId")}
-                placeholder="e.g. 1232, 1233, 1234"
-              />
-              <TextField
-                id="dotpeUsername"
-                label="Dotpe username"
-                required
-                value={values.dotpeUsername}
-                onChange={(v) => setField("dotpeUsername", v)}
-                onBlur={() => handleBlur("dotpeUsername")}
-                error={fieldError("dotpeUsername")}
-              />
+              <div className="grid grid-cols-2 gap-x-5 gap-y-4">
+                <TextField
+                  id="ristaBranchId"
+                  label="BranchID (Rista)"
+                  required
+                  value={values.ristaBranchId}
+                  onChange={(v) => setField("ristaBranchId", v)}
+                  onBlur={() => handleBlur("ristaBranchId")}
+                  error={fieldError("ristaBranchId")}
+                  placeholder="e.g. 1232, 1233, 1234"
+                />
+                <TextField
+                  id="branchCode"
+                  label="BranchCode"
+                  required
+                  value={values.branchCode}
+                  onChange={(v) => setField("branchCode", v)}
+                  onBlur={() => handleBlur("branchCode")}
+                  error={fieldError("branchCode")}
+                  placeholder="e.g. 1232, 1233, 1234"
+                />
+                <TextField
+                  id="storeCode"
+                  label="StoreCode"
+                  required
+                  value={values.storeCode}
+                  onChange={(v) => setField("storeCode", v)}
+                  onBlur={() => handleBlur("storeCode")}
+                  error={fieldError("storeCode")}
+                  placeholder="e.g. 1232, 1233, 1234"
+                />
+                <TextField
+                  id="enterpriseStoreId"
+                  label="StoreId (enterprise)"
+                  required
+                  value={values.enterpriseStoreId}
+                  onChange={(v) => setField("enterpriseStoreId", v)}
+                  onBlur={() => handleBlur("enterpriseStoreId")}
+                  error={fieldError("enterpriseStoreId")}
+                  placeholder="e.g. 1232, 1233, 1234"
+                />
+                <TextField
+                  id="dotpeUsername"
+                  label="Dotpe username"
+                  required
+                  value={values.dotpeUsername}
+                  onChange={(v) => setField("dotpeUsername", v)}
+                  onBlur={() => handleBlur("dotpeUsername")}
+                  error={fieldError("dotpeUsername")}
+                />
+              </div>
             </Section>
 
             <Section title="Feature Enablement">
@@ -455,7 +459,7 @@ export function OnboardingForm({ merchants, userEmail }: { merchants: MerchantOp
                           onBlur={() => handleBlur("loyaltyType")}
                           aria-invalid={!!fieldError("loyaltyType")}
                           className={cn(
-                            "h-10 rounded-lg text-[13px]",
+                            "h-9 rounded-lg text-[13px]",
                             BRAND_FOCUS,
                             fieldError("loyaltyType") && "border-negative"
                           )}
@@ -513,7 +517,7 @@ export function OnboardingForm({ merchants, userEmail }: { merchants: MerchantOp
             <Button
               type="submit"
               disabled={isPending}
-              className="h-10 w-full gap-1.5 rounded-lg bg-[#1188EF] text-white hover:bg-[#1188EF]/90 sm:w-auto sm:self-end"
+              className="h-9 w-auto shrink-0 gap-1.5 self-end rounded-lg bg-[#1188EF] text-white hover:bg-[#1188EF]/90"
             >
               {isPending ? (
                 <>
