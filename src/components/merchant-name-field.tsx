@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 export function MerchantNameField({
   merchants,
@@ -11,6 +12,8 @@ export function MerchantNameField({
   placeholder = "Type or search a merchant name...",
   id,
   name,
+  className,
+  onBlur,
 }: {
   merchants: { id: string; brandName: string }[];
   value: string;
@@ -19,6 +22,8 @@ export function MerchantNameField({
   placeholder?: string;
   id?: string;
   name?: string;
+  className?: string;
+  onBlur?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -51,10 +56,10 @@ export function MerchantNameField({
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
+        onBlur={onBlur}
         placeholder={placeholder}
         autoComplete="off"
-        required
-        className="h-9 rounded-lg text-[13px]"
+        className={cn("h-9 rounded-lg text-[13px]", className)}
       />
       {open && filtered.length > 0 ? (
         <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10">

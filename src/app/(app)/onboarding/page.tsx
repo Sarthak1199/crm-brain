@@ -83,7 +83,7 @@ export default async function OnboardingPage() {
           title="Onboarding"
           description="Loyalty & CRM license requests — raised here or via the original Google Form."
         />
-        {canEdit ? <OnboardingForm merchants={comboMerchants} /> : null}
+        {canEdit ? <OnboardingForm merchants={comboMerchants} userEmail={session?.user?.email ?? ""} /> : null}
       </div>
 
       <div className="sticky top-16 z-[5] -mx-6 mb-6 border-b border-border bg-background/95 px-6 py-3 backdrop-blur md:-mx-8 md:px-8">

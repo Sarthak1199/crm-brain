@@ -314,15 +314,17 @@ model OnboardingRequest {
   enterpriseMerchantId String? // "MerchantID (enterprise):" — matched to Merchant.dotpeMid where possible
   ristaBusinessId      String? // "BusinessID (rista):"
   ristaBrandId         String? // "BrandID (rista):"
-  ristaBranchId        String? // "BranchID (rista):"
-  branchCode           String?
-  storeCode            String?
-  enterpriseStoreId    String? // "StoreId (enterprise):"
+  ristaAccountNumber   String? // "Rista account number"
+  ristaBranchId        String? // "BranchID (rista):" — may be comma-separated (multiple branches in one request)
+  branchCode           String? // may be comma-separated
+  storeCode            String? // may be comma-separated
+  enterpriseStoreId    String? // "StoreId (enterprise):" — may be comma-separated
 
-  loyaltyType         String? // "Visit based loyalty" / "Point based loyalty" (free text — values seen in source)
-  automation          Boolean @default(false)
-  dotpeUsername       String?
-  crmLicenseRequested Boolean @default(false) // "CRM license enable?"
+  loyaltyType            String? // "Visit based loyalty" / "Point based loyalty" (free text — values seen in source)
+  loyaltyForAllBranches  Boolean @default(false) // "Enable loyalty for all branches"
+  automation             Boolean @default(false)
+  dotpeUsername          String?
+  crmLicenseRequested    Boolean @default(false) // "CRM license enable?"
 
   // BE write-back — this app reads these, never sets them
   loyaltyEnabled   Boolean   @default(false) // "Is Enabled (DO NOT FILL)"
@@ -330,7 +332,7 @@ model OnboardingRequest {
   crmEnabled       Boolean   @default(false) // "CRM is Enabled (DO NOT FILL)"
   crmEnabledAt     DateTime? // "CRM enabled At (DO NOT FILL)"
 
-  additionalComment String?
+  additionalComment String? // "Additional Comments" column
   remarks           String?
 
   createdViaPlatform Boolean  @default(false) // true only for requests submitted through this app's native form
