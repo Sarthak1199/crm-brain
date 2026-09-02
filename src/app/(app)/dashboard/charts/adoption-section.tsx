@@ -7,6 +7,7 @@ import { formatNumber } from "@/lib/format";
 import { CHART_BRAND, CHART_GRAY, CHART_GRID, CHART_AXIS, tooltipContentStyle, tooltipLabelStyle } from "./chart-theme";
 import { CHART_SOURCES, type SourceLink } from "@/lib/sync/source-links";
 import { ChartCard } from "@/components/chart-card";
+import { SourcesButton } from "@/components/sources-button";
 import type { adoptionStats } from "@/lib/dashboard-data";
 import type { SerializedMerchant } from "@/lib/serialize";
 import { LoyaltyPanel } from "../panels/loyalty-panel";
@@ -89,25 +90,8 @@ function AdoptionKpiCard({
           View details
           <ArrowUpRight className="size-3" />
         </button>
+        <SourcesButton sources={sources} bare />
       </div>
-      {sources.length > 0 ? (
-        <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground/70">
-          <span>Source:</span>
-          {sources.map((s, i) => (
-            <span key={s.url}>
-              <a
-                href={s.url}
-                target="_blank"
-                rel="noreferrer"
-                className="underline decoration-dotted underline-offset-2 hover:text-muted-foreground"
-              >
-                {s.label}
-              </a>
-              {i < sources.length - 1 ? <span className="ml-1.5">·</span> : null}
-            </span>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }
