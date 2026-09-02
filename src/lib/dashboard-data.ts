@@ -93,57 +93,38 @@ export function salesStatus(merchants: SerializedMerchant[]) {
   };
 }
 
-// ₹ ranges, not day-ranges — the closures sheet has no field that tracks
-// how long a deal has been pending, so bucketing by "days pending" (the
-// spec's original suggestion) has nothing to measure against. Confirmed
-// with the requester: bucket by the Pending Potential closure amount
-// itself instead. Boundaries picked against the real distribution (as of
-// this build, ~65% of paying merchants sit at exactly ₹0 — fully closed —
-// with the rest spread ₹26K–₹25L), not arbitrary round numbers.
-export const POTENTIAL_CLOSURE_BUCKETS = [
-  { key: "closed", label: "₹0 (Fully Closed)", min: 0, max: 0 },
-  { key: "small", label: "₹1 – ₹1L", min: 1, max: 100_000 },
-  { key: "mid", label: "₹1L – ₹5L", min: 100_000, max: 500_000 },
-  { key: "large", label: "₹5L+", min: 500_000, max: Infinity },
-] as const;
-
-export type PotentialClosureBucketKey = (typeof POTENTIAL_CLOSURE_BUCKETS)[number]["key"];
-
-// Exported (not a local helper) so the chart component's own click-to-filter
-// logic buckets a merchant the exact same way as the bar it clicked on,
-// instead of a second, driftable copy of these boundaries.
-export function bucketForValue(value: number): PotentialClosureBucketKey {
-  if (value <= 0) return "closed";
-  if (value <= 100_000) return "small";
-  if (value <= 500_000) return "mid";
-  return "large";
-}
-
-type PendingPotentialRow = { pendingPotentialClosure: number; pendingBranches: number };
+type PendingPotentialRow = {
+  pendingPotentialClosure: number;
+  paymentCollected: number;
+  pendingBranches: number;
+  closedBranches: number;
+};
 
 // Same merchant population as salesStatus() (payment_collected > 0,
 // filtered at the query level in page.tsx) — both read from the same
 // "CRM+Loyalty closures" sheet and the spec calls out that this chart
-// shares that exclusion. `branches` sums pendingBranches (the "outlets
-// still open" column) rather than closedBranches — a merchant's pending
-// deal size is about the outlets it hasn't closed yet.
-export function potentialClosureBuckets<T extends PendingPotentialRow>(merchants: T[]) {
-  const byBucket = new Map<PotentialClosureBucketKey, { count: number; value: number; branches: number }>();
-  for (const b of POTENTIAL_CLOSURE_BUCKETS) byBucket.set(b.key, { count: 0, value: 0, branches: 0 });
-
+// shares that exclusion. Deliberately not bucketed by deal size (an
+// earlier version split this into ₹ price bands — dropped per request, in
+// favor of a plain pending-vs-closed split like the rest of Sales Status).
+// The INR side reads pendingPotentialClosure/paymentCollected directly
+// from the closures sheet (Column P is the ops-tracked ground truth, not a
+// derived total-minus-closed estimate like salesStatus()'s own inr split);
+// the branches side mirrors salesStatus()'s pendingBranches/closedBranches.
+export function potentialClosureSummary<T extends PendingPotentialRow>(merchants: T[]) {
+  let pendingInr = 0;
+  let closedInr = 0;
+  let pendingBranches = 0;
+  let closedBranches = 0;
   for (const m of merchants) {
-    const key = bucketForValue(m.pendingPotentialClosure);
-    const entry = byBucket.get(key)!;
-    entry.count += 1;
-    entry.value += m.pendingPotentialClosure;
-    entry.branches += m.pendingBranches;
+    pendingInr += m.pendingPotentialClosure;
+    closedInr += m.paymentCollected;
+    pendingBranches += m.pendingBranches;
+    closedBranches += m.closedBranches;
   }
-
-  return POTENTIAL_CLOSURE_BUCKETS.map((b) => ({
-    key: b.key,
-    label: b.label,
-    ...byBucket.get(b.key)!,
-  }));
+  return {
+    inr: { pending: pendingInr, closed: closedInr },
+    branches: { pending: pendingBranches, closed: closedBranches },
+  };
 }
 
 // Charts "by MID" don't scale to a full merchant roster (100+ real Mx) —

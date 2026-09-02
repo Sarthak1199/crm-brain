@@ -24,7 +24,6 @@ import {
   wowCreditTrend,
 } from "@/lib/dashboard-data";
 import { DashboardFilters } from "./dashboard-filters";
-import { EmailAlertsCard } from "./email-alerts-card";
 import { ActivationFunnelSection } from "./charts/funnel-section";
 import { SalesStatusSection } from "./charts/sales-status-section";
 import { CreditConsumptionSection } from "./charts/credit-consumption-section";
@@ -48,7 +47,6 @@ export default async function DashboardPage({
   const selectedIds = (params.mx ?? "").split(",").filter(Boolean);
   const session = await auth();
   const canEditRoadmap = canMutate(session?.user?.role, "roadmap");
-  const canEdit = canMutate(session?.user?.role);
 
   // Sales Status ("Total Collected (INR)"/"(Branches)" and both donut
   // charts) is tagged `latest` in the UI — an all-time snapshot the date
@@ -102,7 +100,6 @@ export default async function DashboardPage({
     roadmapItems,
     supportRequests,
     onboardingRequests,
-    emailRecipients,
     allTimeCreditSnapshots,
   ] = await Promise.all([
       prisma.merchant.findMany({
@@ -136,10 +133,6 @@ export default async function DashboardPage({
       prisma.onboardingRequest.findMany({
         where: { merchantId: { not: null } },
         select: { merchantId: true, loyaltyEnabled: true },
-      }),
-      prisma.emailAlertRecipient.findMany({
-        orderBy: { createdAt: "asc" },
-        select: { id: true, email: true },
       }),
       // ARPU is deliberately all-time, not bound by the page's date filter
       // (same "latest" treatment as Sales Status) — a separate, unfiltered
@@ -193,10 +186,7 @@ export default async function DashboardPage({
       <div className="sticky top-16 z-[5] -mx-6 mb-6 border-b border-border bg-background/95 px-6 py-3 backdrop-blur md:-mx-8 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <DashboardFilters merchantOptions={allMerchants} />
-          <div className="flex items-center gap-2">
-            <EmailAlertsCard recipients={emailRecipients} canEdit={canEdit} />
-            <SyncStatusBar />
-          </div>
+          <SyncStatusBar />
         </div>
       </div>
 

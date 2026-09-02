@@ -16,7 +16,17 @@ import { useSort } from "@/hooks/use-sort";
 import { formatInr, formatNumber, formatDate } from "@/lib/format";
 import type { SerializedMerchant } from "@/lib/serialize";
 
-type Row = Pick<SerializedMerchant, "id" | "brandName" | "dotpeMid" | "paymentCollected" | "paymentCollectedDate" | "closedBranches">;
+type Row = Pick<
+  SerializedMerchant,
+  | "id"
+  | "brandName"
+  | "dotpeMid"
+  | "paymentCollected"
+  | "paymentCollectedDate"
+  | "closedBranches"
+  | "pendingPotentialClosure"
+  | "pendingBranches"
+>;
 
 const ACCESSORS = {
   brandName: (r: Row) => r.brandName,
@@ -24,6 +34,8 @@ const ACCESSORS = {
   paymentCollected: (r: Row) => r.paymentCollected,
   paymentCollectedDate: (r: Row) => (r.paymentCollectedDate ? new Date(r.paymentCollectedDate) : null),
   closedBranches: (r: Row) => r.closedBranches,
+  pendingPotentialClosure: (r: Row) => r.pendingPotentialClosure,
+  pendingBranches: (r: Row) => r.pendingBranches,
 };
 
 export function PaymentsPanel({
@@ -49,10 +61,10 @@ export function PaymentsPanel({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full gap-0 overflow-y-auto data-[side=right]:sm:max-w-2xl">
+      <SheetContent className="w-full gap-0 overflow-y-auto data-[side=right]:sm:max-w-4xl">
         <SheetHeader className="border-b border-border pb-4">
           <SheetTitle className="text-[18px]">Payments</SheetTitle>
-          <SheetDescription>Payment collected and paid branches, by merchant.</SheetDescription>
+          <SheetDescription>Collected and pending potential closure, INR and branches, by merchant.</SheetDescription>
         </SheetHeader>
 
         <div className="p-4">
@@ -72,15 +84,17 @@ export function PaymentsPanel({
                 <TableRow className="hover:bg-transparent">
                   <SortableHead label="Brand Name" sortKey="brandName" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableHead label="MID" sortKey="dotpeMid" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
-                  <SortableHead label="Payment Collected" sortKey="paymentCollected" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+                  <SortableHead label="Collected (INR)" sortKey="paymentCollected" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+                  <SortableHead label="Pending (INR)" sortKey="pendingPotentialClosure" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
                   <SortableHead label="Collected Date" sortKey="paymentCollectedDate" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
-                  <SortableHead label="Paid Branches" sortKey="closedBranches" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+                  <SortableHead label="Closed Branches" sortKey="closedBranches" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+                  <SortableHead label="Pending Branches" sortKey="pendingBranches" activeSortKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sorted.length === 0 ? (
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={5} className="py-10 text-center text-[13px] text-muted-foreground">
+                    <TableCell colSpan={7} className="py-10 text-center text-[13px] text-muted-foreground">
                       No matches.
                     </TableCell>
                   </TableRow>
@@ -92,11 +106,17 @@ export function PaymentsPanel({
                       <TableCell className="px-4 py-3 text-right text-[13px] text-foreground">
                         {formatInr(m.paymentCollected, { compact: true })}
                       </TableCell>
+                      <TableCell className="px-4 py-3 text-right text-[13px] text-foreground">
+                        {formatInr(m.pendingPotentialClosure, { compact: true })}
+                      </TableCell>
                       <TableCell className="px-4 py-3 text-right text-[13px] text-muted-foreground">
                         {formatDate(m.paymentCollectedDate)}
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right text-[13px] text-foreground">
                         {formatNumber(m.closedBranches)}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-right text-[13px] text-foreground">
+                        {formatNumber(m.pendingBranches)}
                       </TableCell>
                     </TableRow>
                   ))

@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
-import { Mail, X, Loader2, Plus } from "lucide-react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { Mail, X, Loader2, Plus, Send, Check, AlertTriangle } from "lucide-react";
 import { addEmailAlertRecipient, removeEmailAlertRecipient } from "./email-alerts-actions";
 import { MAX_RECIPIENTS } from "./email-alerts-constants";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,54 @@ function RecipientChip({ id, email, canEdit }: { id: string; email: string; canE
         </button>
       ) : null}
     </span>
+  );
+}
+
+type SendState = { status: "idle" } | { status: "sending" } | { status: "done"; message: string; ok: boolean };
+
+function SendNowButton({ recipientCount }: { recipientCount: number }) {
+  const [state, setState] = useState<SendState>({ status: "idle" });
+
+  async function send() {
+    setState({ status: "sending" });
+    try {
+      const res = await fetch("/api/admin/send-email-report", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || data.ok === false) {
+        setState({ status: "done", ok: false, message: data.error ?? "Send failed." });
+        return;
+      }
+      if (data.skipped) {
+        setState({ status: "done", ok: false, message: "No recipients configured." });
+        return;
+      }
+      setState({ status: "done", ok: true, message: `Sent to ${data.recipients} recipient${data.recipients === 1 ? "" : "s"}.` });
+    } catch {
+      setState({ status: "done", ok: false, message: "Send failed. Please try again." });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={send}
+        disabled={state.status === "sending" || recipientCount === 0}
+        className="h-9 w-full gap-1.5 rounded-lg text-[13px]"
+      >
+        {state.status === "sending" ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+        Send now
+      </Button>
+      {state.status === "done" ? (
+        <p
+          className={`flex items-center gap-1 text-[11px] ${state.ok ? "text-positive-foreground" : "text-negative-foreground"}`}
+        >
+          {state.ok ? <Check className="size-3" /> : <AlertTriangle className="size-3" />}
+          {state.message}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -116,6 +164,12 @@ export function EmailAlertsCard({
         <p className="text-[11px] text-muted-foreground/70">
           {recipients.length}/{MAX_RECIPIENTS} recipients
         </p>
+
+        {canEdit ? (
+          <div className="border-t border-border pt-2.5">
+            <SendNowButton recipientCount={recipients.length} />
+          </div>
+        ) : null}
       </PopoverContent>
     </Popover>
   );

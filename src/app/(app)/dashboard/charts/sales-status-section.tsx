@@ -8,7 +8,7 @@ import { StatCard } from "@/components/stat-card";
 import { formatInr, formatNumber } from "@/lib/format";
 import { CHART_BRAND, CHART_GRAY, tooltipContentStyle, tooltipLabelStyle } from "./chart-theme";
 import { CHART_SOURCES } from "@/lib/sync/source-links";
-import { bucketForValue, potentialClosureBuckets, type PotentialClosureBucketKey, type salesStatus } from "@/lib/dashboard-data";
+import { potentialClosureSummary, type salesStatus } from "@/lib/dashboard-data";
 import type { SerializedMerchant } from "@/lib/serialize";
 import { PaymentsPanel } from "../panels/payments-panel";
 
@@ -24,27 +24,22 @@ type PaymentsRow = Pick<
   | "pendingPotentialClosure"
   | "pendingBranches"
 >;
-type PanelFilter = "all" | "pending" | PotentialClosureBucketKey;
-
-const BUCKET_COLORS: Record<PotentialClosureBucketKey, string> = {
-  closed: CHART_GRAY,
-  small: CHART_BRAND,
-  mid: "#F59E0B",
-  large: "#10B981",
-};
+type PanelFilter = "all" | "pending" | "closed";
 
 function DonutChart({
   pending,
   closed,
   formatter,
+  onSelect,
 }: {
   pending: number;
   closed: number;
   formatter: (n: number) => string;
+  onSelect?: (slice: "pending" | "closed") => void;
 }) {
   const data = [
-    { name: "Closed", value: closed },
-    { name: "Pending", value: pending },
+    { key: "closed" as const, name: "Closed", value: closed },
+    { key: "pending" as const, name: "Pending", value: pending },
   ];
   const total = pending + closed;
 
@@ -61,6 +56,11 @@ function DonutChart({
               outerRadius={64}
               paddingAngle={2}
               stroke="none"
+              cursor={onSelect ? "pointer" : undefined}
+              onClick={(entry) => {
+                const key = (entry as unknown as { payload?: { key?: "pending" | "closed" } })?.payload?.key;
+                if (key) onSelect?.(key);
+              }}
             >
               <Cell fill={CHART_BRAND} />
               <Cell fill={CHART_GRAY} />
@@ -78,82 +78,26 @@ function DonutChart({
         </div>
       </div>
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onSelect?.("closed")}
+          disabled={!onSelect}
+          className="flex items-center gap-2 rounded-md text-left enabled:hover:bg-muted/40"
+        >
           <span className="size-2.5 rounded-full" style={{ background: CHART_BRAND }} />
           <span className="text-[12px] text-muted-foreground">Closed</span>
           <span className="text-[13px] font-medium text-foreground">{formatter(closed)}</span>
-        </div>
-        <div className="flex items-center gap-2">
+        </button>
+        <button
+          type="button"
+          onClick={() => onSelect?.("pending")}
+          disabled={!onSelect}
+          className="flex items-center gap-2 rounded-md text-left enabled:hover:bg-muted/40"
+        >
           <span className="size-2.5 rounded-full" style={{ background: CHART_GRAY }} />
           <span className="text-[12px] text-muted-foreground">Pending</span>
           <span className="text-[13px] font-medium text-foreground">{formatter(pending)}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BucketPieChart({
-  buckets,
-  dataKey,
-  formatter,
-  onSelectBucket,
-}: {
-  buckets: ReturnType<typeof potentialClosureBuckets>;
-  dataKey: "value" | "branches";
-  formatter: (n: number) => string;
-  onSelectBucket: (key: PotentialClosureBucketKey) => void;
-}) {
-  const total = buckets.reduce((a, b) => a + b[dataKey], 0);
-
-  return (
-    <div className="flex items-center gap-4">
-      <div className="relative size-32 shrink-0">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={buckets}
-              dataKey={dataKey}
-              nameKey="label"
-              innerRadius={40}
-              outerRadius={58}
-              paddingAngle={2}
-              stroke="none"
-              cursor="pointer"
-              onClick={(entry) => {
-                const key = (entry as unknown as { payload?: { key?: PotentialClosureBucketKey } })?.payload?.key;
-                if (key) onSelectBucket(key);
-              }}
-            >
-              {buckets.map((b) => (
-                <Cell key={b.key} fill={BUCKET_COLORS[b.key]} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={tooltipContentStyle}
-              labelStyle={tooltipLabelStyle}
-              formatter={(value) => formatter(Number(value))}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[11px] text-muted-foreground">Total</span>
-          <span className="text-[13px] font-semibold text-foreground">{formatter(total)}</span>
-        </div>
-      </div>
-      <div className="flex flex-1 flex-col gap-1.5">
-        {buckets.map((b) => (
-          <button
-            type="button"
-            key={b.key}
-            onClick={() => onSelectBucket(b.key)}
-            className="flex items-center gap-2 rounded-md text-left hover:bg-muted/40"
-          >
-            <span className="size-2.5 shrink-0 rounded-full" style={{ background: BUCKET_COLORS[b.key] }} />
-            <span className="flex-1 truncate text-[12px] text-muted-foreground">{b.label}</span>
-            <span className="text-[12px] font-medium text-foreground">{formatter(b[dataKey])}</span>
-          </button>
-        ))}
+        </button>
       </div>
     </div>
   );
@@ -169,12 +113,12 @@ export function SalesStatusSection({
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelFilter, setPanelFilter] = useState<PanelFilter>("all");
 
-  const buckets = useMemo(() => potentialClosureBuckets(merchants), [merchants]);
+  const potentialClosure = useMemo(() => potentialClosureSummary(merchants), [merchants]);
 
   const panelMerchants = useMemo(() => {
     if (panelFilter === "all") return merchants;
     if (panelFilter === "pending") return merchants.filter((m) => m.pendingPotentialClosure > 0);
-    return merchants.filter((m) => bucketForValue(m.pendingPotentialClosure) === panelFilter);
+    return merchants.filter((m) => m.pendingPotentialClosure <= 0);
   }, [merchants, panelFilter]);
 
   function openPanel(filter: PanelFilter) {
@@ -217,7 +161,7 @@ export function SalesStatusSection({
 
       <ChartCard
         title="Pending Potential Closure"
-        description="Distribution of pending deals by size (payment collected > 0)"
+        description="Pending vs collected, from the closures sheet's own tracked figure (payment collected > 0)"
         sources={CHART_SOURCES.salesStatus}
         className="lg:col-span-2"
         latest
@@ -237,22 +181,22 @@ export function SalesStatusSection({
             <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               By value (INR)
             </p>
-            <BucketPieChart
-              buckets={buckets}
-              dataKey="value"
+            <DonutChart
+              pending={potentialClosure.inr.pending}
+              closed={potentialClosure.inr.closed}
               formatter={(n) => formatInr(n, { compact: true })}
-              onSelectBucket={openPanel}
+              onSelect={openPanel}
             />
           </div>
           <div>
             <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               By branches
             </p>
-            <BucketPieChart
-              buckets={buckets}
-              dataKey="branches"
+            <DonutChart
+              pending={potentialClosure.branches.pending}
+              closed={potentialClosure.branches.closed}
               formatter={(n) => formatNumber(n)}
-              onSelectBucket={openPanel}
+              onSelect={openPanel}
             />
           </div>
         </div>

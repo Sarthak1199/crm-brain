@@ -1,6 +1,8 @@
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { SyncButton } from "./sync-button";
 import { LogoutMenuItem } from "./logout-menu-item";
+import { EmailAlertsCard } from "@/app/(app)/dashboard/email-alerts-card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,10 +26,20 @@ export async function Topbar() {
   // other mutation (Admin + Manager, not plain User), not Admin-only.
   const canSync = canMutate(user?.role);
 
+  // Global (every page under the (app) layout, not just /dashboard) since
+  // this now lives in the Topbar rather than the dashboard's own filter
+  // bar — a small, capped-at-20-rows query, cheap enough to run on every
+  // page load.
+  const emailRecipients = await prisma.emailAlertRecipient.findMany({
+    orderBy: { createdAt: "asc" },
+    select: { id: true, email: true },
+  });
+
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center justify-end border-b border-border bg-background/95 px-6 backdrop-blur">
       <div className="flex items-center gap-3">
         {canSync ? <SyncButton /> : null}
+        <EmailAlertsCard recipients={emailRecipients} canEdit={canSync} />
 
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">

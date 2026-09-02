@@ -38,7 +38,10 @@ export async function addEmailAlertRecipient(
     return "Could not add that address. Please try again.";
   }
 
-  revalidatePath("/dashboard");
+  // "layout" (not the default "page") since the recipient list now renders
+  // in the Topbar — shared by every page under the (app) route group, not
+  // just /dashboard.
+  revalidatePath("/dashboard", "layout");
   return undefined;
 }
 
@@ -47,5 +50,8 @@ export async function removeEmailAlertRecipient(id: string): Promise<void> {
   await prisma.emailAlertRecipient.delete({ where: { id } }).catch((error) => {
     console.error(`removeEmailAlertRecipient: failed to delete ${id}`, error);
   });
-  revalidatePath("/dashboard");
+  // "layout" (not the default "page") since the recipient list now renders
+  // in the Topbar — shared by every page under the (app) route group, not
+  // just /dashboard.
+  revalidatePath("/dashboard", "layout");
 }

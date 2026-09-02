@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core"],
   outputFileTracingIncludes: {
     "/api/cron/email-report": ["./node_modules/@sparticuz/chromium/**"],
-    "/api/admin/one-time-puppeteer-check": ["./node_modules/@sparticuz/chromium/**"],
+    "/api/admin/send-email-report": ["./node_modules/@sparticuz/chromium/**"],
   },
   experimental: {
     // Server Actions default to a 1MB request body — too small for the
