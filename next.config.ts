@@ -5,6 +5,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname),
   },
+  // @sparticuz/chromium ships its own bin/ asset directory that puppeteer-
+  // core reads by relative path at runtime — bundling it (the default for
+  // server code) relocates those files out from under it, so it looks for
+  // /var/task/node_modules/@sparticuz/chromium/bin and finds nothing.
+  // Marking it external keeps node_modules layout intact instead.
+  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core"],
   experimental: {
     // Server Actions default to a 1MB request body — too small for the
     // request form's file upload (PDF/CSV/XLS/images/video). Raised to fit

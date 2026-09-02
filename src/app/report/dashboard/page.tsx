@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { serializeMerchant, serializeSnapshot } from "@/lib/serialize";
 import {
+  arpu,
   creditBreakupByMid,
   creditConsumptionKpis,
   creditConsumptionTable,
@@ -52,7 +53,7 @@ export default async function DashboardReportPage({
     lte: new Date(`${toStr}T23:59:59.999Z`),
   };
 
-  const [creditMerchants, salesStatusMerchants] = await Promise.all([
+  const [creditMerchants, salesStatusMerchants, allTimeCreditSnapshots] = await Promise.all([
     prisma.merchant.findMany({
       where: {
         OR: [{ paymentCollectedDate: null }, { paymentCollectedDate: { gte: from, lte: to } }],
@@ -76,6 +77,12 @@ export default async function DashboardReportPage({
       },
     }),
     prisma.merchant.findMany({ where: salesStatusWhere, orderBy: { brandName: "asc" } }),
+    // ARPU is all-time, not bound by this report's 7-day window — see the
+    // matching comment in dashboard/page.tsx.
+    prisma.merchantSnapshot.findMany({
+      where: { fieldName: "creditConsumption.total" },
+      select: { merchantId: true, value: true },
+    }),
   ]);
 
   const serialized = creditMerchants.map(({ snapshots, ...m }) => ({
@@ -86,6 +93,13 @@ export default async function DashboardReportPage({
   const salesStatusMList = salesStatusMerchants.map(serializeMerchant);
   const snapshotsByMerchant = Object.fromEntries(serialized.map((r) => [r.merchant.id, r.snapshots]));
   const dateRange = { from: fromStr, to: toStr };
+
+  const allTimeCreditTotalByMerchant: Record<string, number> = {};
+  for (const s of allTimeCreditSnapshots) {
+    allTimeCreditTotalByMerchant[s.merchantId] =
+      (allTimeCreditTotalByMerchant[s.merchantId] ?? 0) + Number(s.value);
+  }
+  const arpuData = arpu(salesStatusMList, allTimeCreditTotalByMerchant);
 
   return (
     <div className="min-h-screen bg-background p-8">
@@ -106,12 +120,8 @@ export default async function DashboardReportPage({
           <h2 className="mb-3 text-[16px] font-semibold text-foreground">Credit Consumption</h2>
           <div className="flex flex-col gap-5">
             <CreditConsumptionKpiSection
-              data={creditConsumptionKpis(
-                mList,
-                mList.filter((m) => m.paymentCollected > 0),
-                snapshotsByMerchant,
-                dateRange
-              )}
+              data={creditConsumptionKpis(mList, snapshotsByMerchant, dateRange)}
+              arpu={arpuData}
             />
             <CreditConsumptionSection
               byMid={creditsByMid(mList)}

@@ -11,6 +11,7 @@ import {
   activationFunnelByBranches,
   activationFunnelByMx,
   adoptionStats,
+  arpu,
   creditBreakupByMid,
   creditConsumptionKpis,
   creditConsumptionTable,
@@ -94,8 +95,16 @@ export default async function DashboardPage({
   const snapshotDateFilter: Prisma.MerchantSnapshotWhereInput =
     params.from || params.to ? { capturedAt: capturedAtFilter } : {};
 
-  const [merchants, salesStatusMerchants, allMerchants, roadmapItems, supportRequests, onboardingRequests, emailRecipients] =
-    await Promise.all([
+  const [
+    merchants,
+    salesStatusMerchants,
+    allMerchants,
+    roadmapItems,
+    supportRequests,
+    onboardingRequests,
+    emailRecipients,
+    allTimeCreditSnapshots,
+  ] = await Promise.all([
       prisma.merchant.findMany({
         where,
         orderBy: { brandName: "asc" },
@@ -132,6 +141,15 @@ export default async function DashboardPage({
         orderBy: { createdAt: "asc" },
         select: { id: true, email: true },
       }),
+      // ARPU is deliberately all-time, not bound by the page's date filter
+      // (same "latest" treatment as Sales Status) — a separate, unfiltered
+      // query rather than reusing the date-bounded `snapshots` include
+      // above, which would silently exclude consumption outside whatever
+      // window happens to be selected.
+      prisma.merchantSnapshot.findMany({
+        where: { fieldName: "creditConsumption.total" },
+        select: { merchantId: true, value: true },
+      }),
     ]);
 
   const roadmapRows = roadmapItems.map(serializeRoadmapItem);
@@ -157,6 +175,13 @@ export default async function DashboardPage({
   const snapshotsByMerchant = Object.fromEntries(
     serialized.map((r) => [r.merchant.id, r.snapshots])
   );
+
+  const allTimeCreditTotalByMerchant: Record<string, number> = {};
+  for (const s of allTimeCreditSnapshots) {
+    allTimeCreditTotalByMerchant[s.merchantId] =
+      (allTimeCreditTotalByMerchant[s.merchantId] ?? 0) + Number(s.value);
+  }
+  const arpuData = arpu(salesStatusMList, allTimeCreditTotalByMerchant);
 
   return (
     <div>
@@ -194,12 +219,8 @@ export default async function DashboardPage({
           <h2 className="mb-3 text-[16px] font-semibold text-foreground">Credit Consumption</h2>
           <div className="flex flex-col gap-5">
             <CreditConsumptionKpiSection
-              data={creditConsumptionKpis(
-                mList,
-                mList.filter((m) => m.paymentCollected > 0),
-                snapshotsByMerchant,
-                { from: params.from, to: params.to }
-              )}
+              data={creditConsumptionKpis(mList, snapshotsByMerchant, { from: params.from, to: params.to })}
+              arpu={arpuData}
             />
             <CreditConsumptionSection
               byMid={creditsByMid(mList)}

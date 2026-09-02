@@ -280,7 +280,6 @@ function sumCreditField(
 // be divide-by-zero) and is excluded from the average, not counted as 0.
 export function creditConsumptionKpis(
   allMerchants: SerializedMerchant[],
-  payingMerchants: SerializedMerchant[],
   snapshotsByMerchant: Record<string, SerializedSnapshot[]>,
   dateRange: { from?: string; to?: string } = {}
 ) {
@@ -296,14 +295,44 @@ export function creditConsumptionKpis(
     loyalty += sumCreditField(snaps, "creditConsumption.loyalty", dateRange);
   }
 
-  const ratios: number[] = [];
-  for (const m of payingMerchants) {
-    const consumed = sumCreditField(snapshotsByMerchant[m.id] ?? [], "creditConsumption.total", dateRange);
-    if (consumed > 0) ratios.push(m.paymentCollected / consumed);
-  }
-  const arpu = ratios.length > 0 ? ratios.reduce((a, r) => a + r, 0) / ratios.length : 0;
+  return { totalConsumed, automation, campaigns, loyalty };
+}
 
-  return { totalConsumed, automation, campaigns, loyalty, arpu, arpuSampleSize: ratios.length };
+// ARPU — portfolio-wide, all-time, per branch. Rebuilt after the original
+// version (average of each paying merchant's own paymentCollected÷credits
+// ratio, both date-bounded) turned out wrong on two counts the requester
+// caught: (1) restricting to merchants with *nonzero credit consumption in
+// the currently-selected window* silently shrank the population (22 of
+// ~45 paying merchants, read by the requester as "only 22 paid MIDs" even
+// though that was really the ARPU sample size, not a merchant count) and
+// made the number swing with whatever date filter happened to be
+// selected; (2) it was a per-merchant ratio averaged across merchants,
+// not the aggregate-revenue-over-aggregate-branches figure actually
+// wanted. Now: sum every paying merchant's lifetime Payment Collected
+// (the real subscription figure the requester pointed at — not a flat
+// ₹10k/branch estimate) plus their *all-time* credit consumption
+// (deliberately not date-bound, like Sales Status elsewhere on this
+// page), divide by their total branch count. totalStores (every branch a
+// paying merchant has), not just closedBranches — the subscription
+// figure being divided across is billed on the merchant's full
+// footprint, not only the outlets that happen to be marked closed.
+export function arpu(
+  payingMerchants: Pick<SerializedMerchant, "id" | "paymentCollected" | "totalStores">[],
+  allTimeCreditTotalByMerchant: Record<string, number>
+) {
+  let subscriptionRevenue = 0;
+  let creditRevenue = 0;
+  let branches = 0;
+  for (const m of payingMerchants) {
+    subscriptionRevenue += m.paymentCollected;
+    creditRevenue += allTimeCreditTotalByMerchant[m.id] ?? 0;
+    branches += m.totalStores;
+  }
+  return {
+    value: branches > 0 ? (subscriptionRevenue + creditRevenue) / branches : 0,
+    merchantCount: payingMerchants.length,
+    branchCount: branches,
+  };
 }
 
 export function wowCreditTrend(
