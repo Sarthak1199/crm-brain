@@ -78,9 +78,16 @@ export function ActivationFunnelSection({
   byMx: FunnelStage[];
   byBranches: FunnelStage[];
 }) {
+  const whitelistedMx = byMx.find((s) => s.stage === "Whitelisted")?.count ?? 0;
+
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-      <ChartCard title="Activation Funnel" description="By count of Mx" sources={CHART_SOURCES.activationFunnel} latest>
+      <ChartCard
+        title="Activation Funnel"
+        description={`By count of Mx · Total CRM license whitelisted Mx: ${formatNumber(whitelistedMx)}`}
+        sources={CHART_SOURCES.activationFunnel}
+        latest
+      >
         <FunnelChart data={byMx} />
       </ChartCard>
       <ChartCard

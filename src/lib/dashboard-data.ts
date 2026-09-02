@@ -38,7 +38,7 @@ export function activationFunnelByMx(
   crmActivatedIds: Set<string>
 ): FunnelStage[] {
   return [
-    { stage: "Target", count: merchants.filter(isTargeted).length },
+    { stage: "Whitelisted", count: merchants.filter(isTargeted).length },
     { stage: "Demo", count: merchants.filter(hasDemo).length },
     { stage: "Paid", count: merchants.filter(isPaid).length },
     { stage: "Loyalty active", count: merchants.filter(hasLoyaltyActive).length },
@@ -56,7 +56,7 @@ export function activationFunnelByBranches(
     list.reduce((acc, m) => acc + Number(m[key] ?? 0), 0);
 
   return [
-    { stage: "Target", count: sum(merchants.filter(isTargeted), "totalStores") },
+    { stage: "Whitelisted", count: sum(merchants.filter(isTargeted), "totalStores") },
     { stage: "Demo", count: sum(merchants.filter(hasDemo), "totalStores") },
     { stage: "Paid", count: sum(merchants.filter(isPaid), "closedBranches") },
     { stage: "Loyalty active", count: sum(merchants.filter(hasLoyaltyActive), "closedBranches") },
@@ -70,24 +70,14 @@ export function activationFunnelByBranches(
 }
 
 export function salesStatus(merchants: SerializedMerchant[]) {
-  const totalPotentialInr = merchants.reduce((a, m) => a + m.totalYearlyPotential, 0);
   // Every row in the closures sheet with a matched MID and a payment figure
   // is a real closure — sum it directly. crmActivationConfirmed tracks a
   // separate later step (CRM activation), not whether the sale closed, so
   // gating on it here undercounts confirmed, ops-verified income.
   const closedInr = merchants.reduce((a, m) => a + m.paymentCollected, 0);
-  const pendingInr = Math.max(totalPotentialInr - closedInr, 0);
-
-  // Sourced directly from the GSheet, not computed: pendingBranches is the
-  // "pending outlet closure" column (outlets still open) and closedBranches
-  // is the "outlet closed" column — both per-merchant counts maintained by
-  // ops, not derived from activeDineInStores (which has no data source).
-  const pendingBranches = merchants.reduce((a, m) => a + m.pendingBranches, 0);
   const closedBranches = merchants.reduce((a, m) => a + m.closedBranches, 0);
 
   return {
-    inr: { pending: pendingInr, closed: closedInr },
-    branches: { pending: pendingBranches, closed: closedBranches },
     totalCollectedInr: closedInr,
     totalCollectedBranches: closedBranches,
   };
@@ -105,25 +95,31 @@ type PendingPotentialRow = {
 // "CRM+Loyalty closures" sheet and the spec calls out that this chart
 // shares that exclusion. Deliberately not bucketed by deal size (an
 // earlier version split this into ₹ price bands — dropped per request, in
-// favor of a plain pending-vs-closed split like the rest of Sales Status).
-// The INR side reads pendingPotentialClosure/paymentCollected directly
-// from the closures sheet (Column P is the ops-tracked ground truth, not a
-// derived total-minus-closed estimate like salesStatus()'s own inr split);
-// the branches side mirrors salesStatus()'s pendingBranches/closedBranches.
+// favor of a plain pending-vs-closed split). One consolidated "Pending vs
+// Closed" section now covers all three dimensions (merchants, branches,
+// INR) instead of splitting them across separate cards — merchant-level
+// pending/closed is Column P (pendingPotentialClosure > 0 = pending, ops
+// ground truth); INR sums that same column directly rather than deriving
+// it from totalYearlyPotential minus collected.
 export function potentialClosureSummary<T extends PendingPotentialRow>(merchants: T[]) {
   let pendingInr = 0;
   let closedInr = 0;
   let pendingBranches = 0;
   let closedBranches = 0;
+  let pendingMerchants = 0;
+  let closedMerchants = 0;
   for (const m of merchants) {
     pendingInr += m.pendingPotentialClosure;
     closedInr += m.paymentCollected;
     pendingBranches += m.pendingBranches;
     closedBranches += m.closedBranches;
+    if (m.pendingPotentialClosure > 0) pendingMerchants++;
+    else closedMerchants++;
   }
   return {
     inr: { pending: pendingInr, closed: closedInr },
     branches: { pending: pendingBranches, closed: closedBranches },
+    merchants: { pending: pendingMerchants, closed: closedMerchants },
   };
 }
 
@@ -333,6 +329,12 @@ export function arpu(
     value: avgPerOutletCommercials + creditPerBranch,
     merchantCount: payingMerchants.length,
     branchCount: branches,
+    // Breakdown, kept alongside `value` so the UI's "View details" dialog
+    // can show the actual arithmetic instead of just the final number.
+    avgPerOutletCommercials,
+    perOutletMerchantCount: perOutletCount,
+    creditRevenue,
+    creditPerBranch,
   };
 }
 

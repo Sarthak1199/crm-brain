@@ -52,10 +52,30 @@ export async function sendDashboardEmailReport(): Promise<EmailReportResult> {
     const page = await browser.newPage();
     await page.goto(reportUrl, { waitUntil: "networkidle0", timeout: 90_000 });
     // Recharts finishes its own ResizeObserver-driven layout pass a beat
-    // after the network goes idle — without this, charts can capture as
-    // still-collapsing/zero-height (the same timing quirk observed testing
-    // this page manually).
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    // after the network goes idle — a blind fixed delay here previously
+    // produced screenshots with the page chrome present but charts (and,
+    // per a real report, seemingly other values too) still blank/collapsed.
+    // Wait for an actual readiness signal instead: every chart wrapper on
+    // the page must report a nonzero size before it's safe to capture.
+    // Bounded so a genuinely broken page still gets screenshotted (for a
+    // useful error, not a hang) rather than blocking forever.
+    await page
+      .waitForFunction(
+        () => {
+          const wrappers = document.querySelectorAll(".recharts-wrapper");
+          if (wrappers.length === 0) return true; // page has no charts to wait for
+          return Array.from(wrappers).every((el) => {
+            const rect = el.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+          });
+        },
+        { timeout: 15_000 }
+      )
+      .catch((error) => {
+        console.error("email-report: chart-readiness wait timed out, capturing anyway", error);
+      });
+    // Small extra buffer for the final paint after layout settles.
+    await new Promise((resolve) => setTimeout(resolve, 500));
     screenshot = (await page.screenshot({ fullPage: true, type: "png" })) as Buffer;
   } catch (error) {
     console.error("email-report: screenshot capture failed", error);

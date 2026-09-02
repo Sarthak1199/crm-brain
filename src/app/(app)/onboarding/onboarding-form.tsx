@@ -35,7 +35,6 @@ type FieldName =
   | "ristaBusinessId"
   | "ristaBrandId"
   | "ristaAccountNumber"
-  | "ristaBranchId"
   | "branchCode"
   | "storeCode"
   | "enterpriseStoreId"
@@ -48,7 +47,6 @@ const REQUIRED_FIELDS: FieldName[] = [
   "ristaBusinessId",
   "ristaBrandId",
   "ristaAccountNumber",
-  "ristaBranchId",
   "branchCode",
   "storeCode",
   "enterpriseStoreId",
@@ -61,7 +59,6 @@ const FIELD_LABELS: Record<FieldName, string> = {
   ristaBusinessId: "BusinessID (Rista)",
   ristaBrandId: "BrandID (Rista)",
   ristaAccountNumber: "Rista account number",
-  ristaBranchId: "BranchID (Rista)",
   branchCode: "BranchCode",
   storeCode: "StoreCode",
   enterpriseStoreId: "StoreId (enterprise)",
@@ -75,7 +72,6 @@ const EMPTY_VALUES: Record<FieldName, string> = {
   ristaBusinessId: "",
   ristaBrandId: "",
   ristaAccountNumber: "",
-  ristaBranchId: "",
   branchCode: "",
   storeCode: "",
   enterpriseStoreId: "",
@@ -369,19 +365,9 @@ export function OnboardingForm({ merchants, userEmail }: { merchants: MerchantOp
 
             <Section
               title="Branch Whitelisting"
-              tip="Whitelisting multiple branches? Comma-separate values, e.g. 1232, 1233, 1234."
+              tip="BranchCode takes multiple branches — comma-separate them (e.g. 1232, 1233, 1234). StoreCode and StoreId (enterprise) take a single ID each."
             >
               <div className="grid grid-cols-2 gap-x-5 gap-y-4">
-                <TextField
-                  id="ristaBranchId"
-                  label="BranchID (Rista)"
-                  required
-                  value={values.ristaBranchId}
-                  onChange={(v) => setField("ristaBranchId", v)}
-                  onBlur={() => handleBlur("ristaBranchId")}
-                  error={fieldError("ristaBranchId")}
-                  placeholder="e.g. 1232, 1233, 1234"
-                />
                 <TextField
                   id="branchCode"
                   label="BranchCode"
@@ -400,7 +386,7 @@ export function OnboardingForm({ merchants, userEmail }: { merchants: MerchantOp
                   onChange={(v) => setField("storeCode", v)}
                   onBlur={() => handleBlur("storeCode")}
                   error={fieldError("storeCode")}
-                  placeholder="e.g. 1232, 1233, 1234"
+                  placeholder="e.g. 1232"
                 />
                 <TextField
                   id="enterpriseStoreId"
@@ -410,7 +396,7 @@ export function OnboardingForm({ merchants, userEmail }: { merchants: MerchantOp
                   onChange={(v) => setField("enterpriseStoreId", v)}
                   onBlur={() => handleBlur("enterpriseStoreId")}
                   error={fieldError("enterpriseStoreId")}
-                  placeholder="e.g. 1232, 1233, 1234"
+                  placeholder="e.g. 1232"
                 />
                 <TextField
                   id="dotpeUsername"

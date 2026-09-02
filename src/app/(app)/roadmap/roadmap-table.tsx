@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ExternalLink } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ExternalLink, Search } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import { SortableHead } from "@/components/sortable-head";
 import { RoadmapStatusSelect } from "@/components/roadmap-status-select";
 import { useSort } from "@/hooks/use-sort";
@@ -25,12 +26,52 @@ const ACCESSORS = {
   goLiveDate: (r: SerializedRoadmapItem) => r.goLiveDate,
 };
 
+// Client-side substring match against the fields most likely to hold the
+// text someone's searching for — title/theme/status first (also visible
+// columns), then the free-text brief fields (description/why/brandSignal)
+// that only show up once a row is opened.
+const SEARCH_FIELDS: (keyof SerializedRoadmapItem)[] = [
+  "title",
+  "theme",
+  "status",
+  "description",
+  "why",
+  "brandSignal",
+];
+
+function matchesSearch(item: SerializedRoadmapItem, query: string): boolean {
+  return SEARCH_FIELDS.some((field) => {
+    const value = item[field];
+    return typeof value === "string" && value.toLowerCase().includes(query);
+  });
+}
+
 export function RoadmapTable({ rows, canEdit }: { rows: SerializedRoadmapItem[]; canEdit: boolean }) {
   const [selected, setSelected] = useState<SerializedRoadmapItem | null>(null);
-  const { sorted, sortKey, direction, toggleSort } = useSort(rows, ACCESSORS);
+  const [query, setQuery] = useState("");
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((item) => matchesSearch(item, q));
+  }, [rows, query]);
+
+  const { sorted, sortKey, direction, toggleSort } = useSort(filtered, ACCESSORS);
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card">
+    <div className="rounded-xl border border-border bg-card">
+      <div className="border-b border-border p-3">
+        <div className="relative max-w-sm">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search title, theme, status, or brief..."
+            className="h-9 rounded-lg pl-8 text-[13px]"
+          />
+        </div>
+      </div>
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -48,7 +89,7 @@ export function RoadmapTable({ rows, canEdit }: { rows: SerializedRoadmapItem[];
           {sorted.length === 0 ? (
             <TableRow className="hover:bg-transparent">
               <TableCell colSpan={6} className="py-12 text-center text-[13px] text-muted-foreground">
-                No roadmap items match these filters.
+                No roadmap items match these filters{query ? " or search" : ""}.
               </TableCell>
             </TableRow>
           ) : (
@@ -92,6 +133,7 @@ export function RoadmapTable({ rows, canEdit }: { rows: SerializedRoadmapItem[];
           )}
         </TableBody>
       </Table>
+      </div>
 
       <RoadmapDetailSheet item={selected} canEdit={canEdit} onOpenChange={(open) => !open && setSelected(null)} />
     </div>

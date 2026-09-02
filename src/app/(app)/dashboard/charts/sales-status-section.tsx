@@ -27,11 +27,13 @@ type PaymentsRow = Pick<
 type PanelFilter = "all" | "pending" | "closed";
 
 function DonutChart({
+  label,
   pending,
   closed,
   formatter,
   onSelect,
 }: {
+  label: string;
   pending: number;
   closed: number;
   formatter: (n: number) => string;
@@ -44,16 +46,17 @@ function DonutChart({
   const total = pending + closed;
 
   return (
-    <div className="flex items-center gap-4">
-      <div className="relative size-36 shrink-0">
+    <div className="flex flex-col items-center gap-3">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <div className="relative size-28 shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               dataKey="value"
               nameKey="name"
-              innerRadius={44}
-              outerRadius={64}
+              innerRadius={34}
+              outerRadius={50}
               paddingAngle={2}
               stroke="none"
               cursor={onSelect ? "pointer" : undefined}
@@ -73,18 +76,18 @@ function DonutChart({
           </PieChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[11px] text-muted-foreground">Total</span>
-          <span className="text-[13px] font-semibold text-foreground">{formatter(total)}</span>
+          <span className="text-[10px] text-muted-foreground">Total</span>
+          <span className="text-[12px] font-semibold text-foreground">{formatter(total)}</span>
         </div>
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         <button
           type="button"
           onClick={() => onSelect?.("closed")}
           disabled={!onSelect}
           className="flex items-center gap-2 rounded-md text-left enabled:hover:bg-muted/40"
         >
-          <span className="size-2.5 rounded-full" style={{ background: CHART_BRAND }} />
+          <span className="size-2.5 shrink-0 rounded-full" style={{ background: CHART_BRAND }} />
           <span className="text-[12px] text-muted-foreground">Closed</span>
           <span className="text-[13px] font-medium text-foreground">{formatter(closed)}</span>
         </button>
@@ -94,7 +97,7 @@ function DonutChart({
           disabled={!onSelect}
           className="flex items-center gap-2 rounded-md text-left enabled:hover:bg-muted/40"
         >
-          <span className="size-2.5 rounded-full" style={{ background: CHART_GRAY }} />
+          <span className="size-2.5 shrink-0 rounded-full" style={{ background: CHART_GRAY }} />
           <span className="text-[12px] text-muted-foreground">Pending</span>
           <span className="text-[13px] font-medium text-foreground">{formatter(pending)}</span>
         </button>
@@ -128,20 +131,6 @@ export function SalesStatusSection({
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-      <ChartCard title="Pending vs Closed" description="By value (INR)" sources={CHART_SOURCES.salesStatus} latest>
-        <DonutChart
-          pending={data.inr.pending}
-          closed={data.inr.closed}
-          formatter={(n) => formatInr(n, { compact: true })}
-        />
-      </ChartCard>
-      <ChartCard title="Pending vs Closed" description="By branches" sources={CHART_SOURCES.salesStatus} latest>
-        <DonutChart
-          pending={data.branches.pending}
-          closed={data.branches.closed}
-          formatter={(n) => formatNumber(n)}
-        />
-      </ChartCard>
       <StatCard
         icon={IndianRupee}
         label="Total Collected (INR)"
@@ -160,8 +149,8 @@ export function SalesStatusSection({
       />
 
       <ChartCard
-        title="Pending Potential Closure"
-        description="Pending vs collected, from the closures sheet's own tracked figure (payment collected > 0)"
+        title="Pending vs Closed"
+        description="Merchants, branches, and INR — from the closures sheet's own tracked figure (payment collected > 0)"
         sources={CHART_SOURCES.salesStatus}
         className="lg:col-span-2"
         latest
@@ -176,29 +165,28 @@ export function SalesStatusSection({
           </button>
         }
       >
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div>
-            <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              By value (INR)
-            </p>
-            <DonutChart
-              pending={potentialClosure.inr.pending}
-              closed={potentialClosure.inr.closed}
-              formatter={(n) => formatInr(n, { compact: true })}
-              onSelect={openPanel}
-            />
-          </div>
-          <div>
-            <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              By branches
-            </p>
-            <DonutChart
-              pending={potentialClosure.branches.pending}
-              closed={potentialClosure.branches.closed}
-              formatter={(n) => formatNumber(n)}
-              onSelect={openPanel}
-            />
-          </div>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+          <DonutChart
+            label="Merchants"
+            pending={potentialClosure.merchants.pending}
+            closed={potentialClosure.merchants.closed}
+            formatter={(n) => formatNumber(n)}
+            onSelect={openPanel}
+          />
+          <DonutChart
+            label="Branches"
+            pending={potentialClosure.branches.pending}
+            closed={potentialClosure.branches.closed}
+            formatter={(n) => formatNumber(n)}
+            onSelect={openPanel}
+          />
+          <DonutChart
+            label="INR"
+            pending={potentialClosure.inr.pending}
+            closed={potentialClosure.inr.closed}
+            formatter={(n) => formatInr(n, { compact: true })}
+            onSelect={openPanel}
+          />
         </div>
       </ChartCard>
 

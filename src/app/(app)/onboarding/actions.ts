@@ -47,8 +47,11 @@ export async function createOnboardingRequest(
   if ("error" in ristaBrandId) return ristaBrandId.error;
   const ristaAccountNumber = requiredText(formData, "ristaAccountNumber", "Rista account number");
   if ("error" in ristaAccountNumber) return ristaAccountNumber.error;
-  const ristaBranchId = requiredText(formData, "ristaBranchId", "BranchID (Rista)");
-  if ("error" in ristaBranchId) return ristaBranchId.error;
+  // No longer collected from the form (dropped per request) — the sheet's
+  // "BranchID (rista)" column stays in place below since removing it would
+  // shift every later column out of alignment with the sheet's header row;
+  // it's just always written empty going forward.
+  const ristaBranchId = "";
   const branchCode = requiredText(formData, "branchCode", "BranchCode");
   if ("error" in branchCode) return branchCode.error;
   const storeCode = requiredText(formData, "storeCode", "StoreCode");
@@ -92,7 +95,7 @@ export async function createOnboardingRequest(
     ristaBusinessId.value, // BusinessID (rista)
     ristaBrandId.value, // BrandID (rista)
     ristaAccountNumber.value, // Rista account number
-    ristaBranchId.value, // BranchID (rista)
+    ristaBranchId, // BranchID (rista)
     branchCode.value, // BranchCode
     storeCode.value, // StoreCode
     enterpriseStoreId.value, // StoreId (enterprise)
@@ -133,7 +136,7 @@ export async function createOnboardingRequest(
       ristaBusinessId: ristaBusinessId.value,
       ristaBrandId: ristaBrandId.value,
       ristaAccountNumber: ristaAccountNumber.value,
-      ristaBranchId: ristaBranchId.value,
+      ristaBranchId: null,
       branchCode: branchCode.value,
       storeCode: storeCode.value,
       enterpriseStoreId: enterpriseStoreId.value,
