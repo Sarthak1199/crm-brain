@@ -35,6 +35,12 @@ export async function GET(request: Request) {
     _max: { capturedAt: true },
   });
 
+  const recentRuns = await prisma.syncRun.findMany({
+    orderBy: { startedAt: "desc" },
+    take: 15,
+    select: { source: true, startedAt: true, finishedAt: true, success: true, error: true },
+  });
+
   return NextResponse.json({
     totalCreditSnapshots: count,
     inLast7Days: inWindow,
@@ -46,5 +52,6 @@ export async function GET(request: Request) {
       count: f._count,
       latest: f._max.capturedAt,
     })),
+    recentSyncRuns: recentRuns,
   });
 }

@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendDashboardEmailReport } from "@/lib/email-report";
 
-// puppeteer-core + @sparticuz/chromium need a real Node process (not the
-// Edge runtime) and a screenshot round-trip is slow (cold-start chromium +
-// page render), hence the generous maxDuration relative to the other cron
-// routes in this app.
+// Prisma needs a real Node process, not the Edge runtime.
 export const runtime = "nodejs";
-export const maxDuration = 180;
+export const maxDuration = 30;
 
 function isAuthorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
