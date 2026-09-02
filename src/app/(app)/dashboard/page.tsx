@@ -23,6 +23,7 @@ import {
   wowCreditTrend,
 } from "@/lib/dashboard-data";
 import { DashboardFilters } from "./dashboard-filters";
+import { EmailAlertsCard } from "./email-alerts-card";
 import { ActivationFunnelSection } from "./charts/funnel-section";
 import { SalesStatusSection } from "./charts/sales-status-section";
 import { CreditConsumptionSection } from "./charts/credit-consumption-section";
@@ -46,6 +47,7 @@ export default async function DashboardPage({
   const selectedIds = (params.mx ?? "").split(",").filter(Boolean);
   const session = await auth();
   const canEditRoadmap = canMutate(session?.user?.role, "roadmap");
+  const canEdit = canMutate(session?.user?.role);
 
   // Sales Status ("Total Collected (INR)"/"(Branches)" and both donut
   // charts) is tagged `latest` in the UI — an all-time snapshot the date
@@ -92,7 +94,7 @@ export default async function DashboardPage({
   const snapshotDateFilter: Prisma.MerchantSnapshotWhereInput =
     params.from || params.to ? { capturedAt: capturedAtFilter } : {};
 
-  const [merchants, salesStatusMerchants, allMerchants, roadmapItems, supportRequests, onboardingRequests] =
+  const [merchants, salesStatusMerchants, allMerchants, roadmapItems, supportRequests, onboardingRequests, emailRecipients] =
     await Promise.all([
       prisma.merchant.findMany({
         where,
@@ -125,6 +127,10 @@ export default async function DashboardPage({
       prisma.onboardingRequest.findMany({
         where: { merchantId: { not: null } },
         select: { merchantId: true, loyaltyEnabled: true },
+      }),
+      prisma.emailAlertRecipient.findMany({
+        orderBy: { createdAt: "asc" },
+        select: { id: true, email: true },
       }),
     ]);
 
@@ -164,6 +170,10 @@ export default async function DashboardPage({
           <DashboardFilters merchantOptions={allMerchants} />
           <SyncStatusBar />
         </div>
+      </div>
+
+      <div className="mb-8">
+        <EmailAlertsCard recipients={emailRecipients} canEdit={canEdit} />
       </div>
 
       <div className="flex flex-col gap-8">

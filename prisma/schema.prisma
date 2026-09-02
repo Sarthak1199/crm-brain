@@ -436,3 +436,13 @@ model TemplateApproval {
 
   @@index([templateId])
 }
+
+// Self-service recipient list for the Mon/Wed/Fri 9:30 AM IST dashboard
+// email report (src/app/api/cron/email-report) — capped at 20 in the
+// server action, not here, since Prisma has no row-count constraint.
+model EmailAlertRecipient {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+  createdBy String? // email of the admin who added it
+}
