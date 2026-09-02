@@ -1,6 +1,7 @@
 import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DeltaPill } from "@/components/status-badge";
+import { SourcesButton } from "@/components/sources-button";
 import type { SourceLink } from "@/lib/sync/source-links";
 
 export function StatCard({
@@ -62,24 +63,7 @@ export function StatCard({
           </button>
         ) : null}
       </div>
-      {sources && sources.length > 0 ? (
-        <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-border pt-2.5 text-[11px] text-muted-foreground/70">
-          <span>Source:</span>
-          {sources.map((s, i) => (
-            <span key={s.url}>
-              <a
-                href={s.url}
-                target="_blank"
-                rel="noreferrer"
-                className="underline decoration-dotted underline-offset-2 hover:text-muted-foreground"
-              >
-                {s.label}
-              </a>
-              {i < sources.length - 1 ? <span className="ml-1.5">·</span> : null}
-            </span>
-          ))}
-        </div>
-      ) : null}
+      <SourcesButton sources={sources} />
     </div>
   );
 }

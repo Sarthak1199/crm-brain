@@ -119,21 +119,24 @@ export function bucketForValue(value: number): PotentialClosureBucketKey {
   return "large";
 }
 
-type PendingPotentialRow = { pendingPotentialClosure: number };
+type PendingPotentialRow = { pendingPotentialClosure: number; pendingBranches: number };
 
 // Same merchant population as salesStatus() (payment_collected > 0,
 // filtered at the query level in page.tsx) — both read from the same
 // "CRM+Loyalty closures" sheet and the spec calls out that this chart
-// shares that exclusion.
+// shares that exclusion. `branches` sums pendingBranches (the "outlets
+// still open" column) rather than closedBranches — a merchant's pending
+// deal size is about the outlets it hasn't closed yet.
 export function potentialClosureBuckets<T extends PendingPotentialRow>(merchants: T[]) {
-  const byBucket = new Map<PotentialClosureBucketKey, { count: number; value: number }>();
-  for (const b of POTENTIAL_CLOSURE_BUCKETS) byBucket.set(b.key, { count: 0, value: 0 });
+  const byBucket = new Map<PotentialClosureBucketKey, { count: number; value: number; branches: number }>();
+  for (const b of POTENTIAL_CLOSURE_BUCKETS) byBucket.set(b.key, { count: 0, value: 0, branches: 0 });
 
   for (const m of merchants) {
     const key = bucketForValue(m.pendingPotentialClosure);
     const entry = byBucket.get(key)!;
     entry.count += 1;
     entry.value += m.pendingPotentialClosure;
+    entry.branches += m.pendingBranches;
   }
 
   return POTENTIAL_CLOSURE_BUCKETS.map((b) => ({
@@ -316,20 +319,37 @@ export function creditConsumptionKpis(
 // paying merchant has), not just closedBranches — the subscription
 // figure being divided across is billed on the merchant's full
 // footprint, not only the outlets that happen to be marked closed.
+// Reads the closures sheet's own "Per outlet commercials" rate directly
+// instead of deriving one from paymentCollected / branches — payment
+// collected so far can lag the full contracted amount (installments,
+// delayed billing), so that ratio doesn't reliably reproduce the
+// ops-negotiated per-outlet rate (confirmed against the live sheet: the
+// simple average of this column across paying merchants lands at ~₹17.3K,
+// matching what was flagged as the real figure; dividing collected revenue
+// by branch count did not). Averaged unweighted across paying merchants,
+// then added to credit revenue per branch — both terms expressed as ₹ per
+// branch/year, denominated on closedBranches (the outlets actually paying),
+// not totalStores (which also counts a merchant's still-pending outlets).
 export function arpu(
-  payingMerchants: Pick<SerializedMerchant, "id" | "paymentCollected" | "totalStores">[],
+  payingMerchants: Pick<SerializedMerchant, "id" | "perOutletCommercials" | "closedBranches">[],
   allTimeCreditTotalByMerchant: Record<string, number>
 ) {
-  let subscriptionRevenue = 0;
+  let perOutletSum = 0;
+  let perOutletCount = 0;
   let creditRevenue = 0;
   let branches = 0;
   for (const m of payingMerchants) {
-    subscriptionRevenue += m.paymentCollected;
+    if (m.perOutletCommercials > 0) {
+      perOutletSum += m.perOutletCommercials;
+      perOutletCount++;
+    }
     creditRevenue += allTimeCreditTotalByMerchant[m.id] ?? 0;
-    branches += m.totalStores;
+    branches += m.closedBranches;
   }
+  const avgPerOutletCommercials = perOutletCount > 0 ? perOutletSum / perOutletCount : 0;
+  const creditPerBranch = branches > 0 ? creditRevenue / branches : 0;
   return {
-    value: branches > 0 ? (subscriptionRevenue + creditRevenue) / branches : 0,
+    value: avgPerOutletCommercials + creditPerBranch,
     merchantCount: payingMerchants.length,
     branchCount: branches,
   };

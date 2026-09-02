@@ -109,6 +109,7 @@ export async function syncCrmLoyaltyClosuresSheet() {
     closedBranches?: number;
     totalYearlyPotential?: number;
     pendingPotentialClosure?: number;
+    perOutletCommercials?: number;
     loyaltyStatus?: "Active" | "Inactive";
     crmActivationConfirmed: boolean;
   };
@@ -129,6 +130,7 @@ export async function syncCrmLoyaltyClosuresSheet() {
     const closedBranches = parseInt_(pick(row, "outlet closed"));
     const totalYearlyPotential = parseAmount(pick(row, "total potential closure yearly"));
     const pendingPotentialClosure = parseAmount(pick(row, "pending potential closure"));
+    const perOutletCommercials = parseAmount(pick(row, "per outlet commercials"));
     const loyaltyStatus = parseYesNo(pick(row, "loyalty activation status"));
     // Explicit boolean, not optional: absence/"No" in this sheet must be able
     // to revoke a previously-confirmed value, not just leave it alone. This
@@ -148,6 +150,7 @@ export async function syncCrmLoyaltyClosuresSheet() {
       closedBranches: closedBranches ?? existingGroup?.closedBranches,
       totalYearlyPotential: totalYearlyPotential ?? existingGroup?.totalYearlyPotential,
       pendingPotentialClosure: pendingPotentialClosure ?? existingGroup?.pendingPotentialClosure,
+      perOutletCommercials: perOutletCommercials ?? existingGroup?.perOutletCommercials,
       loyaltyStatus: loyaltyStatus ?? existingGroup?.loyaltyStatus,
       // A later row's explicit confirmation should win, but don't let a
       // blank/"No" later row silently revoke an earlier row's "Yes".
@@ -174,6 +177,9 @@ export async function syncCrmLoyaltyClosuresSheet() {
       ...(g.totalYearlyPotential !== undefined ? { totalYearlyPotential: g.totalYearlyPotential } : {}),
       ...(g.pendingPotentialClosure !== undefined
         ? { pendingPotentialClosure: g.pendingPotentialClosure }
+        : {}),
+      ...(g.perOutletCommercials !== undefined
+        ? { perOutletCommercials: g.perOutletCommercials }
         : {}),
       ...(g.loyaltyStatus ? { loyaltyStatus: g.loyaltyStatus } : {}),
       crmActivationConfirmed: g.crmActivationConfirmed,

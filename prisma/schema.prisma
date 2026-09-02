@@ -116,6 +116,12 @@ model Merchant {
   // totalYearlyPotential (the derived total-minus-closed figure used
   // elsewhere on the dashboard).
   pendingPotentialClosure Decimal @default(0) @db.Decimal(14, 2)
+  // Source: the closures sheet's "Per outlet commercials" column — the
+  // ops-negotiated ₹/outlet subscription rate for this merchant's deal. Not
+  // reliably reconstructable as paymentCollected / closedBranches (payment
+  // collected so far can lag the full contracted amount), so ARPU reads
+  // this column directly instead — see arpu() in dashboard-data.ts.
+  perOutletCommercials Decimal @default(0) @db.Decimal(10, 2)
 
   // Competitor presence (branch counts on DotPe CRM's product surface)
   reeloBranches       Int @default(0)

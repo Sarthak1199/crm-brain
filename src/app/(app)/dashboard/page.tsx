@@ -193,12 +193,11 @@ export default async function DashboardPage({
       <div className="sticky top-16 z-[5] -mx-6 mb-6 border-b border-border bg-background/95 px-6 py-3 backdrop-blur md:-mx-8 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <DashboardFilters merchantOptions={allMerchants} />
-          <SyncStatusBar />
+          <div className="flex items-center gap-2">
+            <EmailAlertsCard recipients={emailRecipients} canEdit={canEdit} />
+            <SyncStatusBar />
+          </div>
         </div>
-      </div>
-
-      <div className="mb-8">
-        <EmailAlertsCard recipients={emailRecipients} canEdit={canEdit} />
       </div>
 
       <div className="flex flex-col gap-8">

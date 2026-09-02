@@ -57,6 +57,12 @@ export async function proxy(request: NextRequest) {
 // (see src/app/api/admin/sync/route.ts), so gating it here a second time is
 // redundant and, for a plain fetch/curl caller with no cookie, would have
 // the same silent-redirect problem.
+//
+// /report/* is the same story as api/cron: it's the page the email-report
+// cron's headless browser screenshots, gated by its own CRON_SECRET query
+// token (see src/app/report/dashboard/page.tsx), and Puppeteer carries no
+// session cookie either. Without this exclusion every screenshot silently
+// captured the /login page instead of the dashboard.
 export const config = {
-  matcher: ["/((?!api/auth|api/cron|api/admin|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/auth|api/cron|api/admin|report|_next/static|_next/image|favicon.ico).*)"],
 };

@@ -6,6 +6,14 @@ import { addEmailAlertRecipient, removeEmailAlertRecipient } from "./email-alert
 import { MAX_RECIPIENTS } from "./email-alerts-constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverDescription,
+} from "@/components/ui/popover";
 
 export type EmailAlertRecipientRow = { id: string; email: string };
 
@@ -49,55 +57,66 @@ export function EmailAlertsCard({
   const atLimit = recipients.length >= MAX_RECIPIENTS;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 shadow-none">
-      <div className="flex items-center gap-2">
-        <div className="flex size-9 items-center justify-center rounded-full bg-muted">
-          <Mail className="size-4 text-foreground" />
-        </div>
-        <div>
-          <p className="text-[13px] font-semibold text-foreground">Email Alerts</p>
-          <p className="text-[12px] text-muted-foreground">
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="relative flex size-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Email alerts"
+        >
+          <Mail className="size-4" />
+          {recipients.length > 0 ? (
+            <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-semibold text-primary-foreground">
+              {recipients.length}
+            </span>
+          ) : null}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80">
+        <PopoverHeader>
+          <PopoverTitle className="text-[13px]">Email Alerts</PopoverTitle>
+          <PopoverDescription className="text-[12px]">
             Full dashboard snapshot — Mon, Wed, Fri at 9:30 AM IST (rolling last 7 days)
-          </p>
-        </div>
-      </div>
+          </PopoverDescription>
+        </PopoverHeader>
 
-      {recipients.length > 0 ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {recipients.map((r) => (
-            <RecipientChip key={r.id} id={r.id} email={r.email} canEdit={canEdit} />
-          ))}
-        </div>
-      ) : (
-        <p className="mt-4 text-[12px] text-muted-foreground">No recipients yet — add one below.</p>
-      )}
-
-      {canEdit ? (
-        <form ref={formRef} action={formAction} className="mt-4 flex items-start gap-2">
-          <div className="flex-1">
-            <Input
-              name="email"
-              type="email"
-              placeholder="name@dotpe.in"
-              disabled={atLimit}
-              className="h-9 rounded-lg text-[13px]"
-            />
-            {error ? <p className="mt-1 text-[12px] text-negative-foreground">{error}</p> : null}
+        {recipients.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {recipients.map((r) => (
+              <RecipientChip key={r.id} id={r.id} email={r.email} canEdit={canEdit} />
+            ))}
           </div>
-          <Button
-            type="submit"
-            disabled={isPending || atLimit}
-            className="h-9 gap-1.5 rounded-lg bg-[#0B1220] text-white hover:bg-[#0B1220]/90"
-          >
-            {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-            Add
-          </Button>
-        </form>
-      ) : null}
+        ) : (
+          <p className="text-[12px] text-muted-foreground">No recipients yet — add one below.</p>
+        )}
 
-      <p className="mt-2 text-[11px] text-muted-foreground/70">
-        {recipients.length}/{MAX_RECIPIENTS} recipients
-      </p>
-    </div>
+        {canEdit ? (
+          <form ref={formRef} action={formAction} className="flex items-start gap-2">
+            <div className="flex-1">
+              <Input
+                name="email"
+                type="email"
+                placeholder="name@dotpe.in"
+                disabled={atLimit}
+                className="h-9 rounded-lg text-[13px]"
+              />
+              {error ? <p className="mt-1 text-[12px] text-negative-foreground">{error}</p> : null}
+            </div>
+            <Button
+              type="submit"
+              disabled={isPending || atLimit}
+              className="h-9 gap-1.5 rounded-lg bg-[#0B1220] text-white hover:bg-[#0B1220]/90"
+            >
+              {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+              Add
+            </Button>
+          </form>
+        ) : null}
+
+        <p className="text-[11px] text-muted-foreground/70">
+          {recipients.length}/{MAX_RECIPIENTS} recipients
+        </p>
+      </PopoverContent>
+    </Popover>
   );
 }

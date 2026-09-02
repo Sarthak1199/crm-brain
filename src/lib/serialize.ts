@@ -4,6 +4,7 @@ const DECIMAL_FIELDS = [
   "paymentCollected",
   "totalYearlyPotential",
   "pendingPotentialClosure",
+  "perOutletCommercials",
   "preCrmCredits",
   "postCrmCredits",
   "momCreditConsumption",
