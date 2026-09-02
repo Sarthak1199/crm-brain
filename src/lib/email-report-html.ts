@@ -1,4 +1,4 @@
-import { formatInr, formatNumber } from "@/lib/format";
+import { formatInr, formatNumber, formatDate } from "@/lib/format";
 import type { EmailReportData } from "@/lib/report-data";
 
 // Table-based layout with inline styles throughout, plus inline SVG bar
@@ -77,8 +77,13 @@ function pendingClosedRow(label: string, pending: string, closed: string) {
   `;
 }
 
-function sectionTitle(title: string) {
-  return `<div style="font-size:15px;font-weight:700;color:${INK};margin:28px 0 12px">${title}</div>`;
+function sectionTitle(title: string, subtitle?: string) {
+  return `
+    <div style="margin:28px 0 12px">
+      <div style="font-size:15px;font-weight:700;color:${INK}">${title}</div>
+      ${subtitle ? `<div style="font-size:11px;color:${MUTED};margin-top:2px">${subtitle}</div>` : ""}
+    </div>
+  `;
 }
 
 function card(inner: string) {
@@ -98,6 +103,13 @@ export function buildReportHtml(data: EmailReportData, dashboardUrl: string): st
     { label: "Closed", value: potentialClosure.inr.closed, display: formatInr(potentialClosure.inr.closed, { compact: true }), color: EMERALD },
     { label: "Pending", value: potentialClosure.inr.pending, display: formatInr(potentialClosure.inr.pending, { compact: true }), color: AMBER },
   ]);
+
+  // Credit consumption and adoption are both sourced from once-a-week
+  // Redash snapshots (see latestCompleteWeekRange in sync-redash.ts) — a
+  // single completed week, not the rolling 7-day window the rest of this
+  // email uses, so it gets its own explicit label rather than implying a
+  // "last 7 days" figure that isn't what's actually being summed.
+  const weekLabel = `Week of ${formatDate(data.weekFromStr)} – ${formatDate(data.weekToStr)}`;
 
   return `
 <div style="background:${PAGE_BG};padding:24px 12px;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
@@ -134,7 +146,7 @@ export function buildReportHtml(data: EmailReportData, dashboardUrl: string): st
       `)}
     </div>
 
-    ${sectionTitle("Credit Consumption")}
+    ${sectionTitle("Credit Consumption", weekLabel)}
     ${kpiRow([
       kpiCell("Total Credit Consumed", formatInr(credit.totalConsumed, { compact: true }), VIOLET),
       kpiCell("ARPU", formatInr(arpu.value, { compact: true }), VIOLET, "per branch/year"),
@@ -147,7 +159,7 @@ export function buildReportHtml(data: EmailReportData, dashboardUrl: string): st
       `)}
     </div>
 
-    ${sectionTitle("Adoption Summary")}
+    ${sectionTitle("Adoption Summary", weekLabel)}
     ${kpiRow([
       kpiCell("Loyalty Setups", `${formatNumber(adoption.loyaltySetups)}`, EMERALD, `of ${formatNumber(adoption.loyaltyLicensedCount)} licensed`),
       kpiCell("Automation Setups", `${formatNumber(adoption.automationSetups)}`, EMERALD, `of ${formatNumber(adoption.crmActivatedCount)} CRM active`),

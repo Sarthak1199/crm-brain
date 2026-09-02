@@ -186,6 +186,21 @@ function currentWeekAnchor(): number {
   return WEEK_ANCHOR_EPOCH_MS + weeksSinceEpoch * WEEK_MS;
 }
 
+// The most recent fully-completed week's boundaries, matching exactly what
+// syncCreditConsumptionByWeek/syncCustomersReachedByWeek write their w=1
+// snapshot under (capturedAt = weekAnchor - WEEK_MS). A caller querying
+// this weekly-grained data with a naive "rolling last N calendar days"
+// window will miss it entirely most days of the week — the single dated
+// snapshot for "last week" only falls inside a 7-day trailing window on
+// the first ~1-2 days of the new week, and reads as an all-zero gap the
+// rest of the time (not a sync failure, just the wrong window shape for
+// weekly-grained data). Read the exact boundaries the sync itself uses
+// instead of guessing a wider one.
+export function latestCompleteWeekRange(): { start: Date; end: Date } {
+  const anchor = currentWeekAnchor();
+  return { start: new Date(anchor - WEEK_MS), end: new Date(anchor - 1) };
+}
+
 /**
  * Step 3: per-merchant weekly credit consumption, split by campaign/
  * automation/loyalty. Query 11147 used to take a "trailing weekCount weeks"
