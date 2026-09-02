@@ -6,11 +6,21 @@ const nextConfig: NextConfig = {
     root: path.join(__dirname),
   },
   // @sparticuz/chromium ships its own bin/ asset directory that puppeteer-
-  // core reads by relative path at runtime — bundling it (the default for
-  // server code) relocates those files out from under it, so it looks for
-  // /var/task/node_modules/@sparticuz/chromium/bin and finds nothing.
-  // Marking it external keeps node_modules layout intact instead.
+  // core reads by relative path at runtime.
+  // - serverExternalPackages keeps Next.js's own bundler from inlining it
+  //   (which would relocate the files out from under the relative path).
+  // - outputFileTracingIncludes is the separate fix needed on top of that:
+  //   Vercel's deploy step only ships files it can statically trace as
+  //   required by a route, and chromium.executablePath() computes its file
+  //   path at runtime rather than a static import, so the tracer misses
+  //   bin/ entirely without being told explicitly. Confirmed both are
+  //   needed — serverExternalPackages alone still 500'd in production with
+  //   "input directory .../bin does not exist".
   serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core"],
+  outputFileTracingIncludes: {
+    "/api/cron/email-report": ["./node_modules/@sparticuz/chromium/**"],
+    "/api/admin/one-time-puppeteer-check": ["./node_modules/@sparticuz/chromium/**"],
+  },
   experimental: {
     // Server Actions default to a 1MB request body — too small for the
     // request form's file upload (PDF/CSV/XLS/images/video). Raised to fit
