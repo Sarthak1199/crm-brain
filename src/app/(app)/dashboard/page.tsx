@@ -12,6 +12,7 @@ import {
   activationFunnelByMx,
   adoptionStats,
   creditBreakupByMid,
+  creditConsumptionKpis,
   creditConsumptionTable,
   creditsByMid,
   customersReachedByChannel,
@@ -25,6 +26,7 @@ import { DashboardFilters } from "./dashboard-filters";
 import { ActivationFunnelSection } from "./charts/funnel-section";
 import { SalesStatusSection } from "./charts/sales-status-section";
 import { CreditConsumptionSection } from "./charts/credit-consumption-section";
+import { CreditConsumptionKpiSection } from "./charts/credit-consumption-kpis";
 import { OverallTrendLoader } from "./charts/overall-trend-loader";
 import { AdoptionSection } from "./charts/adoption-section";
 import { ProductStatusSection } from "./charts/product-status-section";
@@ -51,7 +53,13 @@ export default async function DashboardPage({
   // chart on this page. It still respects an explicit mx selection (a
   // different kind of narrowing — which merchants, not which time window)
   // via `salesStatusWhere.id` below, just not the date range.
-  const salesStatusWhere: Prisma.MerchantWhereInput = {};
+  //
+  // Excludes merchants with no payment collected yet — filtered here at the
+  // query level (not a UI-side hide) so every downstream total/count
+  // (Sales Status's own sums, the Payments drill-down, the Potential
+  // Closure chart) recalculates against only paying merchants, per the
+  // Sales View KPI spec.
+  const salesStatusWhere: Prisma.MerchantWhereInput = { paymentCollected: { gt: 0 } };
   if (selectedIds.length > 0) {
     salesStatusWhere.id = { in: selectedIds };
   }
@@ -175,6 +183,14 @@ export default async function DashboardPage({
         <section>
           <h2 className="mb-3 text-[16px] font-semibold text-foreground">Credit Consumption</h2>
           <div className="flex flex-col gap-5">
+            <CreditConsumptionKpiSection
+              data={creditConsumptionKpis(
+                mList,
+                mList.filter((m) => m.paymentCollected > 0),
+                snapshotsByMerchant,
+                { from: params.from, to: params.to }
+              )}
+            />
             <CreditConsumptionSection
               byMid={creditsByMid(mList)}
               breakup={creditBreakupByMid(mList, snapshotsByMerchant, { from: params.from, to: params.to })}

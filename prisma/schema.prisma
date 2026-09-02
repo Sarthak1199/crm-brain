@@ -111,6 +111,11 @@ model Merchant {
   totalYearlyPotential Decimal   @default(0) @db.Decimal(14, 2)
   subscriptionRevenue  Decimal   @default(0) @db.Decimal(14, 2)
   creditConsumedL30    Decimal   @default(0) @db.Decimal(14, 2)
+  // Source: the closures sheet's "Pending Potential closure" column (P) —
+  // the ops-tracked ₹ value still open on a merchant's deal, distinct from
+  // totalYearlyPotential (the derived total-minus-closed figure used
+  // elsewhere on the dashboard).
+  pendingPotentialClosure Decimal @default(0) @db.Decimal(14, 2)
 
   // Competitor presence (branch counts on DotPe CRM's product surface)
   reeloBranches       Int @default(0)

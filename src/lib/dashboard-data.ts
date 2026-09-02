@@ -93,6 +93,56 @@ export function salesStatus(merchants: SerializedMerchant[]) {
   };
 }
 
+// ₹ ranges, not day-ranges — the closures sheet has no field that tracks
+// how long a deal has been pending, so bucketing by "days pending" (the
+// spec's original suggestion) has nothing to measure against. Confirmed
+// with the requester: bucket by the Pending Potential closure amount
+// itself instead. Boundaries picked against the real distribution (as of
+// this build, ~65% of paying merchants sit at exactly ₹0 — fully closed —
+// with the rest spread ₹26K–₹25L), not arbitrary round numbers.
+export const POTENTIAL_CLOSURE_BUCKETS = [
+  { key: "closed", label: "₹0 (Fully Closed)", min: 0, max: 0 },
+  { key: "small", label: "₹1 – ₹1L", min: 1, max: 100_000 },
+  { key: "mid", label: "₹1L – ₹5L", min: 100_000, max: 500_000 },
+  { key: "large", label: "₹5L+", min: 500_000, max: Infinity },
+] as const;
+
+export type PotentialClosureBucketKey = (typeof POTENTIAL_CLOSURE_BUCKETS)[number]["key"];
+
+// Exported (not a local helper) so the chart component's own click-to-filter
+// logic buckets a merchant the exact same way as the bar it clicked on,
+// instead of a second, driftable copy of these boundaries.
+export function bucketForValue(value: number): PotentialClosureBucketKey {
+  if (value <= 0) return "closed";
+  if (value <= 100_000) return "small";
+  if (value <= 500_000) return "mid";
+  return "large";
+}
+
+type PendingPotentialRow = { pendingPotentialClosure: number };
+
+// Same merchant population as salesStatus() (payment_collected > 0,
+// filtered at the query level in page.tsx) — both read from the same
+// "CRM+Loyalty closures" sheet and the spec calls out that this chart
+// shares that exclusion.
+export function potentialClosureBuckets<T extends PendingPotentialRow>(merchants: T[]) {
+  const byBucket = new Map<PotentialClosureBucketKey, { count: number; value: number }>();
+  for (const b of POTENTIAL_CLOSURE_BUCKETS) byBucket.set(b.key, { count: 0, value: 0 });
+
+  for (const m of merchants) {
+    const key = bucketForValue(m.pendingPotentialClosure);
+    const entry = byBucket.get(key)!;
+    entry.count += 1;
+    entry.value += m.pendingPotentialClosure;
+  }
+
+  return POTENTIAL_CLOSURE_BUCKETS.map((b) => ({
+    key: b.key,
+    label: b.label,
+    ...byBucket.get(b.key)!,
+  }));
+}
+
 // Charts "by MID" don't scale to a full merchant roster (100+ real Mx) —
 // cap to the top N by the metric being charted so bars/lines/legends stay
 // readable. A caller that has actively filtered down to a handful of
@@ -199,6 +249,61 @@ export function creditConsumptionTable(
       };
     })
     .sort((a, b) => b.total - a.total);
+}
+
+function sumCreditField(
+  snaps: SerializedSnapshot[],
+  fieldName: string,
+  dateRange: { from?: string; to?: string }
+) {
+  return snaps
+    .filter((s) => s.fieldName === fieldName)
+    .filter((s) => {
+      const weekKey = new Date(s.capturedAt).toISOString().slice(0, 10);
+      if (dateRange.from && weekKey < dateRange.from) return false;
+      if (dateRange.to && weekKey > dateRange.to) return false;
+      return true;
+    })
+    .reduce((a, s) => a + s.value, 0);
+}
+
+// The four fixed Credit Consumption KPI cards, plus ARPU as a fifth. Total/
+// Automation/Campaign/Loyalty are portfolio-wide sums across every merchant
+// in the current filter (not top-N like the charts below them) — same
+// creditConsumption.* snapshots (Redash 11147), same date-range bounding.
+//
+// ARPU is *not* an aggregate-over-aggregate ratio: per the requester,
+// compute each paying merchant's own (lifetime Payment Collected ÷ that
+// merchant's date-bounded Total Credit Consumed) and average those
+// per-merchant ratios across paying merchants only. A merchant with ₹0
+// credit consumed in the selected window has no ratio to contribute (would
+// be divide-by-zero) and is excluded from the average, not counted as 0.
+export function creditConsumptionKpis(
+  allMerchants: SerializedMerchant[],
+  payingMerchants: SerializedMerchant[],
+  snapshotsByMerchant: Record<string, SerializedSnapshot[]>,
+  dateRange: { from?: string; to?: string } = {}
+) {
+  let totalConsumed = 0;
+  let automation = 0;
+  let campaigns = 0;
+  let loyalty = 0;
+  for (const m of allMerchants) {
+    const snaps = snapshotsByMerchant[m.id] ?? [];
+    totalConsumed += sumCreditField(snaps, "creditConsumption.total", dateRange);
+    automation += sumCreditField(snaps, "creditConsumption.automations", dateRange);
+    campaigns += sumCreditField(snaps, "creditConsumption.campaigns", dateRange);
+    loyalty += sumCreditField(snaps, "creditConsumption.loyalty", dateRange);
+  }
+
+  const ratios: number[] = [];
+  for (const m of payingMerchants) {
+    const consumed = sumCreditField(snapshotsByMerchant[m.id] ?? [], "creditConsumption.total", dateRange);
+    if (consumed > 0) ratios.push(m.paymentCollected / consumed);
+  }
+  const arpu = ratios.length > 0 ? ratios.reduce((a, r) => a + r, 0) / ratios.length : 0;
+
+  return { totalConsumed, automation, campaigns, loyalty, arpu, arpuSampleSize: ratios.length };
 }
 
 export function wowCreditTrend(

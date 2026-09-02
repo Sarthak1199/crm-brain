@@ -57,6 +57,10 @@ export const CHART_SOURCES = {
     REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.creditConsumptionBreakup],
     REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.mxGrain],
   ],
+  creditConsumptionKpis: [
+    REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.creditConsumptionBreakup],
+    GSHEET_SOURCE_LINKS.crmLoyaltyClosures,
+  ],
   licenses: [REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.mxGrain]],
   transactingBranches: [REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.mxGrain]],
   wowByMid: [REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.creditConsumptionBreakup]],
