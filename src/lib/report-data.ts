@@ -34,14 +34,16 @@ export async function getEmailReportData() {
   const weekToStr = week.end.toISOString().slice(0, 10);
   const weekDateRange = { from: weekFromStr, to: weekToStr };
 
-  // Same population as the live dashboard's own Credit Consumption /
-  // Adoption sections (paymentCollected > 0, restricted further by
-  // paymentCollectedDate when a date range applies) — matching it exactly
-  // so the email's numbers aren't a second, slightly different definition
-  // of the same metrics.
+  // paymentCollected > 0 is a Sales Status / Potential Closure scoping
+  // rule only, per the Sales View KPI spec — it must not narrow the
+  // population Credit Consumption / Adoption read from (`where` below).
+  // It briefly did (matching a same-shaped bug in the live dashboard's own
+  // query, since fixed): scoping credit consumption to paying merchants
+  // only silently dropped every not-yet-paying merchant's usage, reading
+  // ~₹3.1L consumed over a comparable 30-day window against Redash's own
+  // ~₹9.3L for the full population.
   const salesStatusWhere: Prisma.MerchantWhereInput = { paymentCollected: { gt: 0 } };
   const where: Prisma.MerchantWhereInput = {
-    ...salesStatusWhere,
     OR: [{ paymentCollectedDate: null }, { paymentCollectedDate: { gte: from, lte: to } }],
   };
 

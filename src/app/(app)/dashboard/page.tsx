@@ -48,24 +48,33 @@ export default async function DashboardPage({
   const session = await auth();
   const canEditRoadmap = canMutate(session?.user?.role, "roadmap");
 
+  // An explicit mx selection (which merchants, not which time window)
+  // narrows every section on the page equally.
+  const mxWhere: Prisma.MerchantWhereInput = {};
+  if (selectedIds.length > 0) {
+    mxWhere.id = { in: selectedIds };
+  }
+
   // Sales Status ("Total Collected (INR)"/"(Branches)" and both donut
   // charts) is tagged `latest` in the UI — an all-time snapshot the date
   // filter isn't supposed to touch, same promise as every other `latest`
-  // chart on this page. It still respects an explicit mx selection (a
-  // different kind of narrowing — which merchants, not which time window)
-  // via `salesStatusWhere.id` below, just not the date range.
+  // chart on this page.
   //
   // Excludes merchants with no payment collected yet — filtered here at the
-  // query level (not a UI-side hide) so every downstream total/count
-  // (Sales Status's own sums, the Payments drill-down, the Potential
-  // Closure chart) recalculates against only paying merchants, per the
-  // Sales View KPI spec.
-  const salesStatusWhere: Prisma.MerchantWhereInput = { paymentCollected: { gt: 0 } };
-  if (selectedIds.length > 0) {
-    salesStatusWhere.id = { in: selectedIds };
-  }
+  // query level (not a UI-side hide), per the Sales View KPI spec, but only
+  // for Sales Status's own sums, the Payments drill-down, and the Potential
+  // Closure chart (this where clause). It must NOT leak into `where` below
+  // — Activation Funnel, Credit Consumption, Adoption Status, and Customers
+  // Reached all need the full targeted/whitelisted population, since a
+  // merchant actively consuming credits or reaching customers hasn't
+  // necessarily paid yet. It did leak in once already: `where` used to be
+  // `{ ...salesStatusWhere }`, which silently dropped every
+  // not-yet-paying merchant's credit consumption from those KPIs — e.g.
+  // the dashboard read ~₹3.1L consumed over the last 30 days against
+  // Redash's own ~₹9.3L for the same population/window once unscoped.
+  const salesStatusWhere: Prisma.MerchantWhereInput = { paymentCollected: { gt: 0 }, ...mxWhere };
 
-  const where: Prisma.MerchantWhereInput = { ...salesStatusWhere };
+  const where: Prisma.MerchantWhereInput = { ...mxWhere };
   if (params.from || params.to) {
     where.OR = [
       { paymentCollectedDate: null },
