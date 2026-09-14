@@ -4,6 +4,7 @@ import { put, del } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireMutate, requireAuthenticated } from "@/lib/require-mutate";
+import { KNOWN_REQUEST_STATUSES } from "@/lib/request-status";
 
 const MAX_FILES = 6;
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB per file
@@ -261,6 +262,18 @@ export async function updateSupportRequest(
 
   revalidatePath("/requests");
   return undefined;
+}
+
+// Unlike updateRoadmapStatus, this IS a strict allowlist — a request's
+// status has no sheet-sourced free-text history to preserve, so there's no
+// "keep whatever's already there" case to protect against.
+export async function updateSupportRequestStatus(requestId: string, status: string): Promise<void> {
+  await requireMutate();
+  const trimmed = status.trim();
+  if (trimmed && !KNOWN_REQUEST_STATUSES.includes(trimmed as (typeof KNOWN_REQUEST_STATUSES)[number])) return;
+
+  await prisma.supportRequest.update({ where: { id: requestId }, data: { status: trimmed || null } });
+  revalidatePath("/requests");
 }
 
 export async function deleteSupportRequest(requestId: string): Promise<void> {

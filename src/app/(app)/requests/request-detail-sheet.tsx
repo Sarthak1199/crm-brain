@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Section, Field } from "@/components/detail-panel";
+import { RequestStatusSelect } from "@/components/request-status-select";
 import { formatDate, formatInr, formatNumber, formatPercent } from "@/lib/format";
 import { deleteSupportRequest } from "./actions";
 import { RequestForm } from "./request-form";
@@ -73,6 +74,7 @@ export function RequestDetailSheet({
                     >
                       {row.type}
                     </span>
+                    <RequestStatusSelect id={row.id} status={row.status} canEdit={canEdit} />
                   </div>
                   {canEdit ? (
                     <div className="mr-6 flex items-center gap-1.5">

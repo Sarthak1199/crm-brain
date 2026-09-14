@@ -261,6 +261,12 @@ model SupportRequest {
   totalBranches  Int                @default(0)
   totalPotential Decimal            @default(0) @db.Decimal(14, 2)
   productRemarks String?
+  // Admin-set dev-lifecycle stage — null means not yet picked up (shown as
+  // "New" in the UI). A lighter 3-value set than RoadmapItem.status's
+  // 5-value one (no Design/QA split): a request only needs "Picked" / "In
+  // Tech" / "Shipped" until it's promoted into an actual roadmap item,
+  // where the fuller lifecycle applies. See src/lib/request-status.ts.
+  status         String?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   createdBy      String?

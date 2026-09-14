@@ -15,6 +15,7 @@ import { formatNumber, formatInr, formatDate, formatPercent } from "@/lib/format
 import { useSort } from "@/hooks/use-sort";
 import { cn } from "@/lib/utils";
 import type { SerializedSupportRequest } from "@/lib/serialize";
+import { RequestStatusSelect } from "@/components/request-status-select";
 import { RequestDetailSheet } from "./request-detail-sheet";
 
 // merchant is null for requests filed against a name typed in fresh (not
@@ -48,6 +49,7 @@ const ACCESSORS = {
   brandName: (r: RequestRow) => merchantName(r),
   dotpeMid: (r: RequestRow) => r.merchant?.dotpeMid ?? "",
   type: (r: RequestRow) => r.type,
+  status: (r: RequestRow) => r.status ?? "",
   totalBranches: (r: RequestRow) => r.totalBranches,
   closurePercent: (r: RequestRow) => closurePercent(r),
   merchantPotential: (r: RequestRow) => r.merchant?.totalYearlyPotential ?? null,
@@ -95,6 +97,7 @@ export function RequestsTable({
             <SortableHead label="Merchant" sortKey="brandName" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="MID" sortKey="dotpeMid" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableHead label="Type" sortKey="type" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
+            <SortableHead label="Status" sortKey="status" activeSortKey={sortKey} direction={direction} onSort={toggleSort} />
             <TableHead className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Description
             </TableHead>
@@ -111,7 +114,7 @@ export function RequestsTable({
         <TableBody>
           {sorted.length === 0 ? (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={10} className="py-12 text-center text-[13px] text-muted-foreground">
+              <TableCell colSpan={11} className="py-12 text-center text-[13px] text-muted-foreground">
                 No requests yet.
               </TableCell>
             </TableRow>
@@ -133,6 +136,9 @@ export function RequestsTable({
                 </TableCell>
                 <TableCell className="px-4 py-3.5">
                   <TypeBadge type={row.type} />
+                </TableCell>
+                <TableCell className="px-4 py-3.5">
+                  <RequestStatusSelect id={row.id} status={row.status} canEdit={canEdit} />
                 </TableCell>
                 <TableCell className="max-w-xs px-4 py-3.5 text-[13px] text-foreground">
                   {/* line-clamp instead of a single truncated line — some
