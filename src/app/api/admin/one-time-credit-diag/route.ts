@@ -31,6 +31,21 @@ export async function GET(request: Request) {
   });
 
   const merchantCount = await prisma.merchant.count();
+  const payingMerchantCount = await prisma.merchant.count({ where: { paymentCollected: { gt: 0 } } });
+
+  const payingMerchantIds = (
+    await prisma.merchant.findMany({ where: { paymentCollected: { gt: 0 } }, select: { id: true } })
+  ).map((m) => m.id);
+
+  const rolling30Paying = await prisma.merchantSnapshot.aggregate({
+    where: {
+      fieldName: "creditConsumption.total",
+      capturedAt: { gte: thirtyDaysAgo, lte: now },
+      merchantId: { in: payingMerchantIds },
+    },
+    _sum: { value: true },
+    _count: true,
+  });
 
   const recentSyncRuns = await prisma.syncRun.findMany({
     orderBy: { startedAt: "desc" },
@@ -42,8 +57,10 @@ export async function GET(request: Request) {
     serverNow: now.toISOString(),
     thirtyDaysAgo: thirtyDaysAgo.toISOString(),
     merchantCount,
+    payingMerchantCount,
     byWeek,
     rolling30,
+    rolling30Paying,
     recentSyncRuns,
   });
 }
