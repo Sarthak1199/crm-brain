@@ -84,32 +84,40 @@ export async function createOnboardingRequest(
   const dotpeMid = normalizeMid(enterpriseMerchantId.value);
   const merchant = await prisma.merchant.findUnique({ where: { dotpeMid }, select: { id: true } });
 
-  // Column order must match the live sheet's header row exactly (verified
-  // directly against the sheet, not assumed) — this is what the existing
-  // BE whitelist job reads.
+  // Column order must match the live sheet's header row exactly — verified
+  // directly against the sheet (A:X, 24 columns), not assumed. The
+  // previous version of this array was missing the "CRM Error" and
+  // "Loyalty Error" columns entirely, shifting every column after them
+  // left by two: Additional Comments was landing in column U ("Loyalty
+  // Error (CLEAR TO RETRY)", an ops-monitoring column it was silently
+  // overwriting on every submission) instead of its real column W, and
+  // "Enable loyalty for all branches" was landing in V ("[FRD Response ID]
+  // DO NOT REMOVE") instead of X.
   const rowValues = [
-    formatTimestampIST(now), // Timestamp
-    email, // Email address
-    businessName.value, // Business name
-    enterpriseMerchantId.value, // MerchantID (enterprise)
-    ristaBusinessId.value, // BusinessID (rista)
-    ristaBrandId.value, // BrandID (rista)
-    ristaAccountNumber.value, // Rista account number
-    ristaBranchId, // BranchID (rista)
-    branchCode.value, // BranchCode
-    storeCode.value, // StoreCode
-    enterpriseStoreId.value, // StoreId (enterprise)
-    loyaltyType ?? "", // Loyalty type
-    automationChecked ? "Yes" : "", // Automation?
-    dotpeUsername.value, // Dotpe username
-    crmChecked ? "Yes" : "", // CRM license enable?
-    "", // Is Enabled (DO NOT FILL)
-    "", // Enabled At (DO NOT FILL)
-    "", // CRM is Enabled (DO NOT FILL)
-    "", // CRM enabled At (DO NOT FILL)
-    "", // [FRD Response ID] DO NOT REMOVE
-    typeof additionalComment === "string" ? additionalComment.trim() : "", // Additional Comments
-    loyaltyForAllBranches ? "Yes" : "", // Enable loyalty for all branches
+    formatTimestampIST(now), // A: Timestamp
+    email, // B: Email address
+    businessName.value, // C: Business name
+    enterpriseMerchantId.value, // D: MerchantID (enterprise)
+    ristaBusinessId.value, // E: BusinessID (rista)
+    ristaBrandId.value, // F: BrandID (rista)
+    ristaAccountNumber.value, // G: Rista account number
+    ristaBranchId, // H: BranchID (rista)
+    branchCode.value, // I: BranchCodes
+    storeCode.value, // J: StoreCode
+    enterpriseStoreId.value, // K: StoreId (enterprise)
+    loyaltyType ?? "", // L: Loyalty type
+    automationChecked ? "Yes" : "", // M: Automation?
+    dotpeUsername.value, // N: Dotpe username
+    crmChecked ? "Yes" : "", // O: CRM license enable?
+    "", // P: Loyalty Is Enabled (DO NOT FILL)
+    "", // Q: Loyalty Enabled At (DO NOT FILL)
+    "", // R: CRM is Enabled (DO NOT FILL)
+    "", // S: CRM enabled At (DO NOT FILL)
+    "", // T: CRM Error (CLEAR TO RETRY)
+    "", // U: Loyalty Error (CLEAR TO RETRY)
+    "", // V: [FRD Response ID] DO NOT REMOVE
+    typeof additionalComment === "string" ? additionalComment.trim() : "", // W: Additional Comments
+    loyaltyForAllBranches ? "Yes" : "", // X: Enable loyalty for all branches
   ];
 
   let sheetRowIndex: number;
