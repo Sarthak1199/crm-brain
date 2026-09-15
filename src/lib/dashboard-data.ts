@@ -33,6 +33,27 @@ function hasAutomationsActive(m: SerializedMerchant) {
   return Array.isArray(m.automationsRules) && (m.automationsRules as string[]).length > 0;
 }
 
+export type WhitelistedMerchantRow = Pick<
+  SerializedMerchant,
+  "id" | "brandName" | "dotpeMid" | "totalStores" | "closedBranches" | "paymentCollected"
+> & { paid: boolean };
+
+// The Activation Funnel's own "Whitelisted"/"Paid" populations, exposed as
+// row data for the funnel's "View details" drill-down — same isTargeted/
+// isPaid definitions the funnel counts itself are built from, so the
+// panel's rows always agree with the chart's own numbers.
+export function whitelistedMerchants(merchants: SerializedMerchant[]): WhitelistedMerchantRow[] {
+  return merchants.filter(isTargeted).map((m) => ({
+    id: m.id,
+    brandName: m.brandName,
+    dotpeMid: m.dotpeMid,
+    totalStores: m.totalStores,
+    closedBranches: m.closedBranches,
+    paymentCollected: m.paymentCollected,
+    paid: isPaid(m),
+  }));
+}
+
 export function activationFunnelByMx(
   merchants: SerializedMerchant[],
   crmActivatedIds: Set<string>

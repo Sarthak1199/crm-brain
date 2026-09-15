@@ -12,46 +12,39 @@ export async function GET(request: Request) {
   }
 
   const merchants = await prisma.merchant.findMany({
-    select: { id: true, brandName: true, dotpeMid: true, loyaltyStatus: true, grainHasLoyalty: true },
+    select: { id: true, brandName: true, dotpeMid: true, loyaltyStatus: true },
   });
   const merchantByMid = new Map(merchants.map((m) => [normalizeMid(m.dotpeMid), m]));
 
-  const rows = await fetchMxGrain();
-  const hasLoyaltyRows = rows.filter((r) => (r as unknown as Record<string, unknown>)["Has_Loyalty"]);
+  const rows = (await fetchMxGrain()) as unknown as Record<string, unknown>[];
+  const byMid = new Map(rows.map((r) => [normalizeMid(String(r["Dotpe_Merchant_ID"])), r]));
 
-  const matchedHasLoyalty = hasLoyaltyRows
-    .map((r) => {
-      const rec = r as unknown as Record<string, unknown>;
-      const merchant = merchantByMid.get(normalizeMid(String(rec["Dotpe_Merchant_ID"])));
-      return { redashMid: rec["Dotpe_Merchant_ID"], redashName: rec["Dotpe_Merchant_Name"], merchant };
-    });
+  const hasLoyaltyCrmTrueFresh = rows.filter((r) => r["Has_Loyalty_CRM"]).length;
 
-  const matchedCount = matchedHasLoyalty.filter((x) => x.merchant).length;
-  const unmatchedSample = matchedHasLoyalty.filter((x) => !x.merchant).slice(0, 10);
+  // Cross-check both candidate fields against our known-good loyaltyStatus
+  // (query 10921, CRM-specific loyalty funnel) for every merchant in our
+  // roster, to see which one (if either) actually agrees with it.
+  const crossCheck = merchants.map((m) => {
+    const row = byMid.get(normalizeMid(m.dotpeMid));
+    return {
+      brandName: m.brandName,
+      dotpeMid: m.dotpeMid,
+      loyaltyStatusActive: m.loyaltyStatus === "Active",
+      Has_Loyalty: row ? !!row["Has_Loyalty"] : "NOT_IN_11166",
+      Has_Loyalty_CRM: row ? !!row["Has_Loyalty_CRM"] : "NOT_IN_11166",
+      Products_Owned: row ? row["Products_Owned"] : "NOT_IN_11166",
+    };
+  });
 
-  // Cross-check the other direction: of merchants with loyaltyStatus
-  // Active (the real usage signal, 42), how many show Has_Loyalty in the
-  // fresh Redash fetch vs what's stored as grainHasLoyalty in our DB?
-  const activeLoyaltyMerchants = merchants.filter((m) => m.loyaltyStatus === "Active");
-  const freshHasLoyaltyByMid = new Map(
-    rows.map((r) => {
-      const rec = r as unknown as Record<string, unknown>;
-      return [normalizeMid(String(rec["Dotpe_Merchant_ID"])), !!rec["Has_Loyalty"]];
-    })
-  );
-  const activeLoyaltyCrossCheck = activeLoyaltyMerchants.map((m) => ({
-    brandName: m.brandName,
-    dotpeMid: m.dotpeMid,
-    storedGrainHasLoyalty: m.grainHasLoyalty,
-    freshRedashHasLoyalty: freshHasLoyaltyByMid.get(normalizeMid(m.dotpeMid)) ?? "NOT_FOUND_IN_11166",
-  }));
+  const agreesWithHasLoyalty = crossCheck.filter((c) => c.loyaltyStatusActive === c.Has_Loyalty).length;
+  const agreesWithHasLoyaltyCrm = crossCheck.filter((c) => c.loyaltyStatusActive === c.Has_Loyalty_CRM).length;
 
   return NextResponse.json({
-    totalRedashRows: rows.length,
-    hasLoyaltyTrueInRedashFresh: hasLoyaltyRows.length,
-    matchedToOurRoster: matchedCount,
-    ourDbGrainHasLoyaltyTrue: merchants.filter((m) => m.grainHasLoyalty).length,
-    unmatchedSample,
-    activeLoyaltyCrossCheck,
+    merchantCount: merchants.length,
+    loyaltyStatusActiveCount: merchants.filter((m) => m.loyaltyStatus === "Active").length,
+    hasLoyaltyCrmTrueFreshInFullDataset: hasLoyaltyCrmTrueFresh,
+    agreesWithHasLoyalty,
+    agreesWithHasLoyaltyCrm,
+    crossCheckSample: crossCheck.slice(0, 30),
   });
 }

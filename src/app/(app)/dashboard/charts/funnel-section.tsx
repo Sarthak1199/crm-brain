@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Bar,
   BarChart,
@@ -11,11 +12,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { ArrowUpRight } from "lucide-react";
 import { ChartCard } from "@/components/chart-card";
 import { formatNumber } from "@/lib/format";
-import type { FunnelStage } from "@/lib/dashboard-data";
+import type { FunnelStage, WhitelistedMerchantRow } from "@/lib/dashboard-data";
 import { CHART_SOURCES } from "@/lib/sync/source-links";
 import { CHART_BRAND, CHART_GRID, CHART_AXIS, tooltipContentStyle, tooltipLabelStyle } from "./chart-theme";
+import { WhitelistedPanel } from "../panels/whitelisted-panel";
 
 const VIOLET = "#8B5CF6";
 const AMBER = "#F59E0B";
@@ -74,10 +77,13 @@ function FunnelChart({ data }: { data: FunnelStage[] }) {
 export function ActivationFunnelSection({
   byMx,
   byBranches,
+  whitelisted,
 }: {
   byMx: FunnelStage[];
   byBranches: FunnelStage[];
+  whitelisted: WhitelistedMerchantRow[];
 }) {
+  const [panelOpen, setPanelOpen] = useState(false);
   const whitelistedMx = byMx.find((s) => s.stage === "Whitelisted")?.count ?? 0;
 
   return (
@@ -87,6 +93,16 @@ export function ActivationFunnelSection({
         description={`By count of Mx · Total CRM license whitelisted Mx: ${formatNumber(whitelistedMx)}`}
         sources={CHART_SOURCES.activationFunnel}
         latest
+        action={
+          <button
+            type="button"
+            onClick={() => setPanelOpen(true)}
+            className="inline-flex shrink-0 items-center gap-0.5 text-[12px] font-medium text-primary hover:underline"
+          >
+            View details
+            <ArrowUpRight className="size-3" />
+          </button>
+        }
       >
         <FunnelChart data={byMx} />
       </ChartCard>
@@ -98,6 +114,8 @@ export function ActivationFunnelSection({
       >
         <FunnelChart data={byBranches} />
       </ChartCard>
+
+      <WhitelistedPanel merchants={whitelisted} open={panelOpen} onOpenChange={setPanelOpen} />
     </div>
   );
 }

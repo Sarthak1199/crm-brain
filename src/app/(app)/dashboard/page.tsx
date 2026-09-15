@@ -10,6 +10,7 @@ import { SyncStatusBar } from "@/components/sync-status-bar";
 import {
   activationFunnelByBranches,
   activationFunnelByMx,
+  whitelistedMerchants,
   adoptionStats,
   arpu,
   creditBreakupByMid,
@@ -222,6 +223,7 @@ export default async function DashboardPage({
           <ActivationFunnelSection
             byMx={activationFunnelByMx(mList, crmActivatedIds)}
             byBranches={activationFunnelByBranches(mList, crmActivatedIds)}
+            whitelisted={whitelistedMerchants(mList)}
           />
         </section>
 
