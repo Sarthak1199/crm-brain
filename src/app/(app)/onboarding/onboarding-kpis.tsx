@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, KeyRound, Gift, Megaphone, CheckCircle2 } from "lucide-react";
+import { FileText, KeyRound, Gift, Megaphone } from "lucide-react";
 import { StatCard } from "@/components/stat-card";
 import { formatNumber } from "@/lib/format";
 import { CHART_SOURCES, REDASH_SOURCE_LINKS } from "@/lib/sync/source-links";
@@ -13,20 +13,18 @@ export function OnboardingKpis({
   crmLicenseEnabled,
   loyaltyLicenseEnabled,
   marketingLicenseEnabled,
-  finalOnboarded,
   requests,
 }: {
   requestsRaised: number;
   crmLicenseEnabled: number;
   loyaltyLicenseEnabled: number;
   marketingLicenseEnabled: number;
-  finalOnboarded: number;
   requests: OnboardingRequestRow[];
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
 
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard
         icon={FileText}
         label="Request Raised"
@@ -51,12 +49,6 @@ export function OnboardingKpis({
         label="Marketing License Enabled"
         value={formatNumber(marketingLicenseEnabled)}
         sources={[REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.mxGrain]]}
-      />
-      <StatCard
-        icon={CheckCircle2}
-        label="Final Onboarded"
-        value={formatNumber(finalOnboarded)}
-        sources={CHART_SOURCES.onboarding}
       />
 
       <OnboardingRequestsPanel requests={requests} open={panelOpen} onOpenChange={setPanelOpen} />

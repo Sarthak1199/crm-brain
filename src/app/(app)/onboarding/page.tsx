@@ -46,9 +46,6 @@ export default async function OnboardingPage() {
   // Licenses table below) — fed by the mxGrain sync (Redash 11166's
   // Has_WABA), same source as ristaStatus/dotpeStatus in that table.
   const marketingLicenseEnabled = merchants.filter((m) => m.wabaStatus === "Active").length;
-  const finalOnboarded = requests.filter(
-    (r) => r.loyaltyEnabled && (!r.crmLicenseRequested || r.crmEnabled)
-  ).length;
 
   const requestRows = requests.map((r) => ({
     id: r.id,
@@ -98,7 +95,6 @@ export default async function OnboardingPage() {
           crmLicenseEnabled={crmLicenseEnabled}
           loyaltyLicenseEnabled={loyaltyLicenseEnabled}
           marketingLicenseEnabled={marketingLicenseEnabled}
-          finalOnboarded={finalOnboarded}
           requests={requestRows}
         />
       </div>
