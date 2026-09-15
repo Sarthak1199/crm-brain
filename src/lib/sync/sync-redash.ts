@@ -181,23 +181,26 @@ const WEEK_ANCHOR_EPOCH_MS = Date.UTC(2020, 0, 6);
 // Redash query, param name, or category mislabeling; the query and field
 // mapping were both correct, but the same real week's true total got
 // counted once per historical sync run.
-function currentWeekAnchor(): number {
-  const weeksSinceEpoch = Math.floor((Date.now() - WEEK_ANCHOR_EPOCH_MS) / WEEK_MS);
+function currentWeekAnchor(asOf: number = Date.now()): number {
+  const weeksSinceEpoch = Math.floor((asOf - WEEK_ANCHOR_EPOCH_MS) / WEEK_MS);
   return WEEK_ANCHOR_EPOCH_MS + weeksSinceEpoch * WEEK_MS;
 }
 
-// The most recent fully-completed week's boundaries, matching exactly what
-// syncCreditConsumptionByWeek/syncCustomersReachedByWeek write their w=1
-// snapshot under (capturedAt = weekAnchor - WEEK_MS). A caller querying
-// this weekly-grained data with a naive "rolling last N calendar days"
-// window will miss it entirely most days of the week — the single dated
-// snapshot for "last week" only falls inside a 7-day trailing window on
-// the first ~1-2 days of the new week, and reads as an all-zero gap the
-// rest of the time (not a sync failure, just the wrong window shape for
-// weekly-grained data). Read the exact boundaries the sync itself uses
-// instead of guessing a wider one.
-export function latestCompleteWeekRange(): { start: Date; end: Date } {
-  const anchor = currentWeekAnchor();
+// The most recent fully-completed week's boundaries as of `asOf` (default
+// now), matching exactly what syncCreditConsumptionByWeek/
+// syncCustomersReachedByWeek write their w=1 snapshot under
+// (capturedAt = weekAnchor - WEEK_MS). A caller querying this
+// weekly-grained data with a naive "rolling last N calendar days" window
+// will miss it entirely most days of the week — the single dated snapshot
+// for "last week" only falls inside a 7-day trailing window on the first
+// ~1-2 days of the new week, and reads as an all-zero gap the rest of the
+// time (not a sync failure, just the wrong window shape for weekly-grained
+// data). Read the exact boundaries the sync itself uses instead of
+// guessing a wider one. `asOf` lets a caller anchor this to an arbitrary
+// reference point (e.g. a selected date-range's `to`) rather than always
+// "now" — the live dashboard's date filter can end anywhere.
+export function latestCompleteWeekRange(asOf: Date = new Date()): { start: Date; end: Date } {
+  const anchor = currentWeekAnchor(asOf.getTime());
   return { start: new Date(anchor - WEEK_MS), end: new Date(anchor - 1) };
 }
 

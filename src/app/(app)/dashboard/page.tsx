@@ -23,6 +23,7 @@ import {
   salesStatus,
   wowCreditTrend,
 } from "@/lib/dashboard-data";
+import { latestCompleteWeekRange } from "@/lib/sync/sync-redash";
 import { DashboardFilters } from "./dashboard-filters";
 import { ActivationFunnelSection } from "./charts/funnel-section";
 import { SalesStatusSection } from "./charts/sales-status-section";
@@ -96,11 +97,27 @@ export default async function DashboardPage({
   // date filter slow — narrowing the query itself is the actual fix, not
   // a debounce (there's no rapid-fire input here to debounce: date inputs
   // and preset buttons each commit a single navigation).
-  const capturedAtFilter: Prisma.DateTimeFilter = {};
-  if (params.from) capturedAtFilter.gte = new Date(params.from);
+  // creditConsumption.*/customersReached.* snapshots are written once per
+  // completed calendar week (see latestCompleteWeekRange in
+  // sync-redash.ts), dated to that week's own Monday — not once per day.
+  // A selected range narrower than a week (the "7D" preset, or any custom
+  // pick under 7 days) can miss that single dated snapshot entirely,
+  // reading as a misleading ₹0/0 rather than a real gap — the same issue
+  // already fixed for the email report. Widen the *lower* bound only
+  // (never the upper) far enough to guarantee it always includes the
+  // latest complete week as of the selected `to` (or now, if `to` isn't
+  // set) — 30D/60D/90D are already comfortably wider than this and are
+  // left untouched; this only ever extends `from` backward, never forward.
+  const latestWeek = latestCompleteWeekRange(params.to ? new Date(`${params.to}T23:59:59.999Z`) : undefined);
+  const creditFrom = params.from
+    ? new Date(Math.min(new Date(params.from).getTime(), latestWeek.start.getTime()))
+    : latestWeek.start;
+  const creditFromStr = creditFrom.toISOString().slice(0, 10);
+  const creditDateRange = { from: creditFromStr, to: params.to };
+
+  const capturedAtFilter: Prisma.DateTimeFilter = { gte: creditFrom };
   if (params.to) capturedAtFilter.lte = new Date(`${params.to}T23:59:59.999Z`);
-  const snapshotDateFilter: Prisma.MerchantSnapshotWhereInput =
-    params.from || params.to ? { capturedAt: capturedAtFilter } : {};
+  const snapshotDateFilter: Prisma.MerchantSnapshotWhereInput = { capturedAt: capturedAtFilter };
 
   const [
     merchants,
@@ -217,17 +234,17 @@ export default async function DashboardPage({
           <h2 className="mb-3 text-[16px] font-semibold text-foreground">Credit Consumption</h2>
           <div className="flex flex-col gap-5">
             <CreditConsumptionKpiSection
-              data={creditConsumptionKpis(mList, snapshotsByMerchant, { from: params.from, to: params.to })}
+              data={creditConsumptionKpis(mList, snapshotsByMerchant, creditDateRange)}
               arpu={arpuData}
             />
             <CreditConsumptionSection
               byMid={creditsByMid(mList)}
-              breakup={creditBreakupByMid(mList, snapshotsByMerchant, { from: params.from, to: params.to })}
-              {...wowCreditTrend(mList, snapshotsByMerchant, { from: params.from, to: params.to })}
-              detailsRows={creditConsumptionTable(mList, snapshotsByMerchant, { from: params.from, to: params.to })}
+              breakup={creditBreakupByMid(mList, snapshotsByMerchant, creditDateRange)}
+              {...wowCreditTrend(mList, snapshotsByMerchant, creditDateRange)}
+              detailsRows={creditConsumptionTable(mList, snapshotsByMerchant, creditDateRange)}
             />
             <Suspense fallback={<Skeleton className="h-[352px] w-full rounded-xl" />}>
-              <OverallTrendLoader from={params.from} to={params.to} />
+              <OverallTrendLoader from={creditDateRange.from} to={creditDateRange.to} />
             </Suspense>
           </div>
         </section>
@@ -239,14 +256,8 @@ export default async function DashboardPage({
             merchants={mList}
             loyaltyLicensedCount={loyaltyLicensedIds.size}
             crmActivatedCount={crmActivatedIds.size}
-            customersReachedByChannel={customersReachedByChannel(mList, snapshotsByMerchant, {
-              from: params.from,
-              to: params.to,
-            })}
-            customersReachedRows={customersReachedTable(mList, snapshotsByMerchant, {
-              from: params.from,
-              to: params.to,
-            })}
+            customersReachedByChannel={customersReachedByChannel(mList, snapshotsByMerchant, creditDateRange)}
+            customersReachedRows={customersReachedTable(mList, snapshotsByMerchant, creditDateRange)}
           />
         </section>
 
