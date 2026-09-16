@@ -121,6 +121,7 @@ export function AdoptionSection({
   crmActivatedCount,
   customersReachedByChannel,
   customersReachedRows,
+  canExport,
 }: {
   data: ReturnType<typeof adoptionStats>;
   merchants: AdoptionRow[];
@@ -128,6 +129,7 @@ export function AdoptionSection({
   crmActivatedCount: number;
   customersReachedByChannel: { name: string; campaigns: number; loyalty: number; automations: number }[];
   customersReachedRows: CustomersReachedRow[];
+  canExport?: boolean;
 }) {
   const [loyaltyOpen, setLoyaltyOpen] = useState(false);
   const [automationOpen, setAutomationOpen] = useState(false);
@@ -211,10 +213,10 @@ export function AdoptionSection({
         </div>
       </ChartCard>
 
-      <LoyaltyPanel merchants={merchants} open={loyaltyOpen} onOpenChange={setLoyaltyOpen} />
-      <AutomationPanel merchants={merchants} open={automationOpen} onOpenChange={setAutomationOpen} />
-      <CampaignPanel merchants={merchants} open={campaignOpen} onOpenChange={setCampaignOpen} />
-      <CustomersReachedPanel rows={customersReachedRows} open={customersReachedOpen} onOpenChange={setCustomersReachedOpen} />
+      <LoyaltyPanel merchants={merchants} open={loyaltyOpen} onOpenChange={setLoyaltyOpen} canExport={canExport} />
+      <AutomationPanel merchants={merchants} open={automationOpen} onOpenChange={setAutomationOpen} canExport={canExport} />
+      <CampaignPanel merchants={merchants} open={campaignOpen} onOpenChange={setCampaignOpen} canExport={canExport} />
+      <CustomersReachedPanel rows={customersReachedRows} open={customersReachedOpen} onOpenChange={setCustomersReachedOpen} canExport={canExport} />
     </div>
   );
 }

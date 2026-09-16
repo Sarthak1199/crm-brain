@@ -96,7 +96,7 @@ export default async function TemplatesPage({
         />
       </div>
 
-      <TemplatesTable rows={rows} canEdit={canEdit} />
+      <TemplatesTable rows={rows} canEdit={canEdit} canExport={canEdit} />
     </div>
   );
 }

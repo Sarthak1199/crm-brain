@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { SortableHead } from "@/components/sortable-head";
+import { ExportCsvButton } from "@/components/export-csv-button";
 import { useSort } from "@/hooks/use-sort";
 import { formatNumber } from "@/lib/format";
 
@@ -39,6 +40,7 @@ export function TypedAdoptionPanel<T extends CommonAdoptionRow>({
   defaultDirection = "asc",
   open,
   onOpenChange,
+  canExport = false,
 }: {
   title: string;
   description: string;
@@ -48,6 +50,7 @@ export function TypedAdoptionPanel<T extends CommonAdoptionRow>({
   defaultDirection?: "asc" | "desc";
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canExport?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
@@ -80,13 +83,22 @@ export function TypedAdoptionPanel<T extends CommonAdoptionRow>({
         </SheetHeader>
 
         <div className="p-4">
-          <div className="relative mb-3">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search merchant name..."
-              className="h-9 rounded-lg pl-8 text-[13px]"
+          <div className="mb-3 flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search merchant name..."
+                className="h-9 rounded-lg pl-8 text-[13px]"
+              />
+            </div>
+            <ExportCsvButton
+              canExport={canExport}
+              rows={sorted}
+              headers={["Brand Name", "MID", "Branches", ...extraColumns.map((c) => c.label)]}
+              toRow={(r) => [r.brandName, r.dotpeMid, r.totalStores, ...extraColumns.map((c) => c.accessor(r))]}
+              filename={title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}
             />
           </div>
 

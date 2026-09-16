@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { canMutate } from "@/lib/authz";
 import { serializeMerchant, serializeSnapshot } from "@/lib/serialize";
 import { PageHeader } from "@/components/page-header";
 import { SyncStatusBar } from "@/components/sync-status-bar";
@@ -19,6 +21,8 @@ export default async function DatabasePage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
+  const session = await auth();
+  const canExport = canMutate(session?.user?.role);
 
   const where: Prisma.MerchantWhereInput = {};
   if (params.q) {
@@ -72,7 +76,7 @@ export default async function DatabasePage({
         </div>
       </div>
 
-      <MerchantTable rows={rows} />
+      <MerchantTable rows={rows} canExport={canExport} />
     </div>
   );
 }

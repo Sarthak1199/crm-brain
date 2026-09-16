@@ -43,12 +43,14 @@ export function CreditConsumptionSection({
   data,
   merchantNames,
   detailsRows,
+  canExport,
 }: {
   byMid: { name: string; pre: number; post: number }[];
   breakup: { name: string; campaigns: number; loyalty: number; automations: number }[];
   data: Record<string, number | string>[];
   merchantNames: string[];
   detailsRows: CreditConsumptionRow[];
+  canExport?: boolean;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -139,7 +141,7 @@ export function CreditConsumptionSection({
         </div>
       </ChartCard>
 
-      <CreditConsumptionPanel rows={detailsRows} open={detailsOpen} onOpenChange={setDetailsOpen} />
+      <CreditConsumptionPanel rows={detailsRows} open={detailsOpen} onOpenChange={setDetailsOpen} canExport={canExport} />
     </div>
   );
 }

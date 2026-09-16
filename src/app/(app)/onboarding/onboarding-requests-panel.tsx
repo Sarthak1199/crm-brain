@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { SortableHead } from "@/components/sortable-head";
+import { ExportCsvButton } from "@/components/export-csv-button";
 import { useSort } from "@/hooks/use-sort";
 import { formatDate } from "@/lib/format";
 
@@ -54,10 +55,12 @@ export function OnboardingRequestsPanel({
   requests,
   open,
   onOpenChange,
+  canExport,
 }: {
   requests: OnboardingRequestRow[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canExport?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
@@ -80,13 +83,29 @@ export function OnboardingRequestsPanel({
         </SheetHeader>
 
         <div className="p-4">
-          <div className="relative mb-3">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search business name..."
-              className="h-9 rounded-lg pl-8 text-[13px]"
+          <div className="mb-3 flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search business name..."
+                className="h-9 rounded-lg pl-8 text-[13px]"
+              />
+            </div>
+            <ExportCsvButton
+              canExport={!!canExport}
+              rows={sorted}
+              headers={["Business", "MID", "Loyalty Type", "Loyalty", "CRM", "Submitted"]}
+              toRow={(r) => [
+                r.businessName ?? "",
+                r.enterpriseMerchantId ?? "",
+                r.loyaltyType ?? "",
+                r.loyaltyEnabled ? "Enabled" : "Pending",
+                r.crmLicenseRequested ? (r.crmEnabled ? "Enabled" : "Pending") : "Not requested",
+                formatDate(r.timestamp),
+              ]}
+              filename="onboarding-requests"
             />
           </div>
 

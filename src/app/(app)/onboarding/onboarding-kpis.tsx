@@ -14,12 +14,14 @@ export function OnboardingKpis({
   loyaltyLicenseEnabled,
   marketingLicenseEnabled,
   requests,
+  canExport,
 }: {
   requestsRaised: number;
   crmLicenseEnabled: number;
   loyaltyLicenseEnabled: number;
   marketingLicenseEnabled: number;
   requests: OnboardingRequestRow[];
+  canExport?: boolean;
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
 
@@ -51,7 +53,7 @@ export function OnboardingKpis({
         sources={[REDASH_SOURCE_LINKS[REDASH_QUERY_IDS.mxGrain]]}
       />
 
-      <OnboardingRequestsPanel requests={requests} open={panelOpen} onOpenChange={setPanelOpen} />
+      <OnboardingRequestsPanel requests={requests} open={panelOpen} onOpenChange={setPanelOpen} canExport={canExport} />
     </div>
   );
 }

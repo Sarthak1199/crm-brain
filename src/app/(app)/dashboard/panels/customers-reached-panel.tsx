@@ -45,10 +45,12 @@ export function CustomersReachedPanel({
   rows,
   open,
   onOpenChange,
+  canExport,
 }: {
   rows: CustomersReachedRow[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canExport?: boolean;
 }) {
   return (
     <TypedAdoptionPanel
@@ -60,6 +62,7 @@ export function CustomersReachedPanel({
       defaultDirection="desc"
       open={open}
       onOpenChange={onOpenChange}
+      canExport={canExport}
     />
   );
 }

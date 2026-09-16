@@ -37,10 +37,12 @@ export function CampaignPanel({
   merchants,
   open,
   onOpenChange,
+  canExport,
 }: {
   merchants: Row[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canExport?: boolean;
 }) {
   return (
     <TypedAdoptionPanel
@@ -50,6 +52,7 @@ export function CampaignPanel({
       extraColumns={COLUMNS}
       open={open}
       onOpenChange={onOpenChange}
+      canExport={canExport}
     />
   );
 }

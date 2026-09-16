@@ -44,10 +44,12 @@ export function AutomationPanel({
   merchants,
   open,
   onOpenChange,
+  canExport,
 }: {
   merchants: Row[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canExport?: boolean;
 }) {
   return (
     <TypedAdoptionPanel
@@ -57,6 +59,7 @@ export function AutomationPanel({
       extraColumns={COLUMNS}
       open={open}
       onOpenChange={onOpenChange}
+      canExport={canExport}
     />
   );
 }

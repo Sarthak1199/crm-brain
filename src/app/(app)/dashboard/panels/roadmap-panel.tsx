@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SortableHead } from "@/components/sortable-head";
 import { RoadmapStatusSelect } from "@/components/roadmap-status-select";
+import { ExportCsvButton } from "@/components/export-csv-button";
 import { useSort } from "@/hooks/use-sort";
 import type { SerializedRoadmapItem } from "@/lib/serialize";
 
@@ -33,11 +34,13 @@ export function RoadmapPanel({
   canEdit,
   open,
   onOpenChange,
+  canExport,
 }: {
   items: SerializedRoadmapItem[];
   canEdit: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canExport?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
@@ -60,13 +63,22 @@ export function RoadmapPanel({
         </SheetHeader>
 
         <div className="p-4">
-          <div className="relative mb-3">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search title..."
-              className="h-9 rounded-lg pl-8 text-[13px]"
+          <div className="mb-3 flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search title..."
+                className="h-9 rounded-lg pl-8 text-[13px]"
+              />
+            </div>
+            <ExportCsvButton
+              canExport={!!canExport}
+              rows={sorted}
+              headers={["Title", "Theme", "Status", "Ticket", "Go Live"]}
+              toRow={(item) => [item.title, item.theme ?? "", item.status, firstTicketLink(item.ticketUrl) ?? "", item.goLiveDate ?? ""]}
+              filename="roadmap"
             />
           </div>
 

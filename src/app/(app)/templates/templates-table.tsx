@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { SortableHead } from "@/components/sortable-head";
+import { ExportCsvButton } from "@/components/export-csv-button";
 import { formatDate } from "@/lib/format";
 import { useSort } from "@/hooks/use-sort";
 import { cn } from "@/lib/utils";
@@ -65,7 +66,15 @@ function ChannelBadge({ channel }: { channel: Channel }) {
   );
 }
 
-export function TemplatesTable({ rows, canEdit }: { rows: TemplateRow[]; canEdit: boolean }) {
+export function TemplatesTable({
+  rows,
+  canEdit,
+  canExport,
+}: {
+  rows: TemplateRow[];
+  canEdit: boolean;
+  canExport?: boolean;
+}) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { sorted, sortKey, direction, toggleSort } = useSort(rows, ACCESSORS, {
     key: "createdAt",
@@ -79,7 +88,29 @@ export function TemplatesTable({ rows, canEdit }: { rows: TemplateRow[]; canEdit
   const selected = rows.find((r) => r.id === selectedId) ?? null;
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card">
+    <div className="rounded-xl border border-border bg-card">
+      {canExport ? (
+        <div className="flex items-center justify-end border-b border-border p-3">
+          <ExportCsvButton
+            canExport={canExport}
+            rows={sorted}
+            headers={["Name", "Channel", "Type", "Category", "Handle", "Message", "Event ID", "Default", "Created"]}
+            toRow={(row) => [
+              row.name ?? "",
+              row.channel,
+              row.dealType === "WithDeal" ? "With Deal" : "Without Deal",
+              row.category ?? "",
+              row.handle ? HANDLE_LABELS[row.handle] : "",
+              row.messageText,
+              row.eventId ?? "",
+              row.isDefault ? "Yes" : "No",
+              formatDate(row.createdAt),
+            ]}
+            filename="templates"
+          />
+        </div>
+      ) : null}
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -151,6 +182,7 @@ export function TemplatesTable({ rows, canEdit }: { rows: TemplateRow[]; canEdit
           )}
         </TableBody>
       </Table>
+      </div>
 
       <TemplateDetailSheet row={selected} canEdit={canEdit} onOpenChange={(open) => !open && setSelectedId(null)} />
     </div>

@@ -16,6 +16,7 @@ import { useSort } from "@/hooks/use-sort";
 import { cn } from "@/lib/utils";
 import type { SerializedSupportRequest } from "@/lib/serialize";
 import { RequestStatusSelect } from "@/components/request-status-select";
+import { ExportCsvButton } from "@/components/export-csv-button";
 import { RequestDetailSheet } from "./request-detail-sheet";
 
 // merchant is null for requests filed against a name typed in fresh (not
@@ -78,10 +79,12 @@ export function RequestsTable({
   rows,
   merchants,
   canEdit,
+  canExport,
 }: {
   rows: RequestRow[];
   merchants: MerchantOption[];
   canEdit: boolean;
+  canExport?: boolean;
 }) {
   const [selected, setSelected] = useState<RequestRow | null>(null);
   const { sorted, sortKey, direction, toggleSort } = useSort(rows, ACCESSORS, {
@@ -90,7 +93,41 @@ export function RequestsTable({
   });
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card">
+    <div className="rounded-xl border border-border bg-card">
+      {canExport ? (
+        <div className="flex items-center justify-end border-b border-border p-3">
+          <ExportCsvButton
+            canExport={canExport}
+            rows={sorted}
+            headers={[
+              "Merchant",
+              "MID",
+              "Type",
+              "Status",
+              "Description",
+              "Total Loyalty Branches",
+              "% Closed",
+              "Total Potential",
+              "Pending Potential",
+              "Created",
+            ]}
+            toRow={(row) => [
+              merchantName(row),
+              row.merchant?.dotpeMid ?? "",
+              row.type,
+              row.status ?? "New",
+              row.description,
+              row.totalBranches,
+              formatPercent(closurePercent(row)),
+              row.merchant ? row.merchant.totalYearlyPotential : "",
+              row.totalPotential,
+              formatDate(row.createdAt),
+            ]}
+            filename="requests"
+          />
+        </div>
+      ) : null}
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -177,6 +214,7 @@ export function RequestsTable({
           )}
         </TableBody>
       </Table>
+      </div>
 
       <RequestDetailSheet
         row={selected}

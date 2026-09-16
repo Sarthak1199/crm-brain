@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { SortableHead } from "@/components/sortable-head";
 import { RoadmapStatusSelect } from "@/components/roadmap-status-select";
+import { ExportCsvButton } from "@/components/export-csv-button";
 import { useSort } from "@/hooks/use-sort";
 import { parseTicketLinks } from "@/lib/roadmap-status";
 import type { SerializedRoadmapItem } from "@/lib/serialize";
@@ -46,7 +47,15 @@ function matchesSearch(item: SerializedRoadmapItem, query: string): boolean {
   });
 }
 
-export function RoadmapTable({ rows, canEdit }: { rows: SerializedRoadmapItem[]; canEdit: boolean }) {
+export function RoadmapTable({
+  rows,
+  canEdit,
+  canExport,
+}: {
+  rows: SerializedRoadmapItem[];
+  canEdit: boolean;
+  canExport?: boolean;
+}) {
   const [selected, setSelected] = useState<SerializedRoadmapItem | null>(null);
   const [query, setQuery] = useState("");
 
@@ -60,8 +69,8 @@ export function RoadmapTable({ rows, canEdit }: { rows: SerializedRoadmapItem[];
 
   return (
     <div className="rounded-xl border border-border bg-card">
-      <div className="border-b border-border p-3">
-        <div className="relative max-w-sm">
+      <div className="flex items-center gap-2 border-b border-border p-3">
+        <div className="relative max-w-sm flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
@@ -70,6 +79,20 @@ export function RoadmapTable({ rows, canEdit }: { rows: SerializedRoadmapItem[];
             className="h-9 rounded-lg pl-8 text-[13px]"
           />
         </div>
+        <ExportCsvButton
+          canExport={!!canExport}
+          rows={sorted}
+          headers={["Title", "Theme", "Status", "Design", "Ticket", "Go Live"]}
+          toRow={(item) => [
+            item.title,
+            item.theme ?? "",
+            item.status,
+            item.design ?? "",
+            parseTicketLinks(item.ticketUrl).map((t) => t.url).join("; "),
+            item.goLiveDate ?? "",
+          ]}
+          filename="roadmap"
+        />
       </div>
       <div className="overflow-x-auto">
       <Table>

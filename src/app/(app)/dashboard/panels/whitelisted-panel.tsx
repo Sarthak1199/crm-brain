@@ -32,10 +32,12 @@ export function WhitelistedPanel({
   merchants,
   open,
   onOpenChange,
+  canExport,
 }: {
   merchants: WhitelistedMerchantRow[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canExport?: boolean;
 }) {
   return (
     <TypedAdoptionPanel
@@ -47,6 +49,7 @@ export function WhitelistedPanel({
       defaultDirection="desc"
       open={open}
       onOpenChange={onOpenChange}
+      canExport={canExport}
     />
   );
 }

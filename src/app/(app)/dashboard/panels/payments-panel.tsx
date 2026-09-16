@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { SortableHead } from "@/components/sortable-head";
+import { ExportCsvButton } from "@/components/export-csv-button";
 import { useSort } from "@/hooks/use-sort";
 import { formatInr, formatNumber, formatDate } from "@/lib/format";
 import type { SerializedMerchant } from "@/lib/serialize";
@@ -42,10 +43,12 @@ export function PaymentsPanel({
   merchants,
   open,
   onOpenChange,
+  canExport,
 }: {
   merchants: Row[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canExport?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
@@ -68,13 +71,30 @@ export function PaymentsPanel({
         </SheetHeader>
 
         <div className="p-4">
-          <div className="relative mb-3">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search merchant name..."
-              className="h-9 rounded-lg pl-8 text-[13px]"
+          <div className="mb-3 flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search merchant name..."
+                className="h-9 rounded-lg pl-8 text-[13px]"
+              />
+            </div>
+            <ExportCsvButton
+              canExport={!!canExport}
+              rows={sorted}
+              headers={["Brand Name", "MID", "Collected (INR)", "Pending (INR)", "Collected Date", "Closed Branches", "Pending Branches"]}
+              toRow={(m) => [
+                m.brandName,
+                m.dotpeMid,
+                m.paymentCollected,
+                m.pendingPotentialClosure,
+                formatDate(m.paymentCollectedDate),
+                m.closedBranches,
+                m.pendingBranches,
+              ]}
+              filename="payments"
             />
           </div>
 

@@ -70,11 +70,13 @@ export function ProductStatusSection({
   requestStats,
   roadmapItems,
   canEditRoadmap,
+  canExport,
 }: {
   stages: FunnelStage[];
   requestStats: ReturnType<typeof requestTypeStats>;
   roadmapItems: SerializedRoadmapItem[];
   canEditRoadmap: boolean;
+  canExport?: boolean;
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
 
@@ -137,7 +139,7 @@ export function ProductStatusSection({
         onClick={() => (window.location.href = "/requests?type=Feature")}
       />
 
-      <RoadmapPanel items={roadmapItems} canEdit={canEditRoadmap} open={panelOpen} onOpenChange={setPanelOpen} />
+      <RoadmapPanel items={roadmapItems} canEdit={canEditRoadmap} open={panelOpen} onOpenChange={setPanelOpen} canExport={canExport} />
     </div>
   );
 }

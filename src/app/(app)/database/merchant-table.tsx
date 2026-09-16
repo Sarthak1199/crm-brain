@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { SortableHead } from "@/components/sortable-head";
 import { StatusBadge } from "@/components/status-badge";
+import { ExportCsvButton } from "@/components/export-csv-button";
 import { formatInr, formatNumber } from "@/lib/format";
 import { useSort } from "@/hooks/use-sort";
 import type { SerializedMerchant, SerializedSnapshot } from "@/lib/serialize";
@@ -35,7 +36,7 @@ const ACCESSORS = {
   customerCount: (r: MerchantRow) => r.merchant.customerCount,
 };
 
-export function MerchantTable({ rows }: { rows: MerchantRow[] }) {
+export function MerchantTable({ rows, canExport }: { rows: MerchantRow[]; canExport?: boolean }) {
   const [selected, setSelected] = useState<MerchantRow | null>(null);
   const { sorted, sortKey, direction, toggleSort } = useSort(rows, ACCESSORS, {
     key: "brandName",
@@ -43,7 +44,43 @@ export function MerchantTable({ rows }: { rows: MerchantRow[] }) {
   });
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card">
+    <div className="rounded-xl border border-border bg-card">
+      {canExport ? (
+        <div className="flex items-center justify-end border-b border-border p-3">
+          <ExportCsvButton
+            canExport={canExport}
+            rows={sorted}
+            headers={[
+              "Brand Name",
+              "MID",
+              "CRM License",
+              "Loyalty License",
+              "Onboarded",
+              "Paid Branches",
+              "Total Stores",
+              "Transacting (POS, L90)",
+              "Subscription Rev.",
+              "Credits (L30)",
+              "Customer Count",
+            ]}
+            toRow={(row) => [
+              row.merchant.brandName,
+              row.merchant.dotpeMid,
+              row.merchant.crmStatus,
+              row.loyaltyLicensed ? "Active" : "Inactive",
+              row.merchant.onboarded,
+              row.merchant.closedBranches,
+              row.merchant.totalStores,
+              row.merchant.grainBranchesTransactingPosL90,
+              row.merchant.subscriptionRevenue,
+              row.merchant.creditConsumedL30,
+              row.merchant.customerCount,
+            ]}
+            filename="merchants"
+          />
+        </div>
+      ) : null}
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -112,6 +149,7 @@ export function MerchantTable({ rows }: { rows: MerchantRow[] }) {
           )}
         </TableBody>
       </Table>
+      </div>
 
       <MerchantDetailSheet row={selected} onOpenChange={(open) => !open && setSelected(null)} />
     </div>

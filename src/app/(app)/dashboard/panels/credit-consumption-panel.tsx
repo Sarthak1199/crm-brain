@@ -69,10 +69,12 @@ export function CreditConsumptionPanel({
   rows,
   open,
   onOpenChange,
+  canExport,
 }: {
   rows: CreditConsumptionRow[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canExport?: boolean;
 }) {
   return (
     <TypedAdoptionPanel
@@ -84,6 +86,7 @@ export function CreditConsumptionPanel({
       defaultDirection="desc"
       open={open}
       onOpenChange={onOpenChange}
+      canExport={canExport}
     />
   );
 }

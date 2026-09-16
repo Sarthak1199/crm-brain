@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { SortableHead } from "@/components/sortable-head";
 import { StatusBadge } from "@/components/status-badge";
+import { ExportCsvButton } from "@/components/export-csv-button";
 import { formatNumber } from "@/lib/format";
 import { useSort } from "@/hooks/use-sort";
 
@@ -38,7 +39,13 @@ const ACCESSORS = {
   dotpeStatus: (r: OnboardingMerchantRow) => r.dotpeStatus,
 };
 
-export function OnboardingDetailsTable({ rows }: { rows: OnboardingMerchantRow[] }) {
+export function OnboardingDetailsTable({
+  rows,
+  canExport,
+}: {
+  rows: OnboardingMerchantRow[];
+  canExport?: boolean;
+}) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -52,13 +59,22 @@ export function OnboardingDetailsTable({ rows }: { rows: OnboardingMerchantRow[]
 
   return (
     <div>
-      <div className="relative mb-3 max-w-xs">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search merchant name..."
-          className="h-9 rounded-lg pl-8 text-[13px]"
+      <div className="mb-3 flex items-center gap-2">
+        <div className="relative max-w-xs flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search merchant name..."
+            className="h-9 rounded-lg pl-8 text-[13px]"
+          />
+        </div>
+        <ExportCsvButton
+          canExport={!!canExport}
+          rows={sorted}
+          headers={["Brand Name", "MID", "Branch Size", "Rista", "DotPe", "WABA", "CRM License", "Loyalty License"]}
+          toRow={(r) => [r.brandName, r.dotpeMid, r.totalStores, r.ristaStatus, r.dotpeStatus, r.wabaStatus, r.crmStatus, r.loyaltyStatus]}
+          filename="onboarding-licenses"
         />
       </div>
       <div className="overflow-x-auto rounded-xl border border-border bg-card">

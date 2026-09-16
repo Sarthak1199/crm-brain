@@ -96,6 +96,7 @@ export default async function OnboardingPage() {
           loyaltyLicenseEnabled={loyaltyLicenseEnabled}
           marketingLicenseEnabled={marketingLicenseEnabled}
           requests={requestRows}
+          canExport={canEdit}
         />
       </div>
 
@@ -132,7 +133,7 @@ export default async function OnboardingPage() {
         </a>
         <span>(Loyalty License)</span>
       </p>
-      <OnboardingDetailsTable rows={detailsRows} />
+      <OnboardingDetailsTable rows={detailsRows} canExport={canEdit} />
     </div>
   );
 }

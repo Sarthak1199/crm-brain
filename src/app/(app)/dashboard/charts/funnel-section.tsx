@@ -78,10 +78,12 @@ export function ActivationFunnelSection({
   byMx,
   byBranches,
   whitelisted,
+  canExport,
 }: {
   byMx: FunnelStage[];
   byBranches: FunnelStage[];
   whitelisted: WhitelistedMerchantRow[];
+  canExport?: boolean;
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const whitelistedMx = byMx.find((s) => s.stage === "Whitelisted")?.count ?? 0;
@@ -115,7 +117,7 @@ export function ActivationFunnelSection({
         <FunnelChart data={byBranches} />
       </ChartCard>
 
-      <WhitelistedPanel merchants={whitelisted} open={panelOpen} onOpenChange={setPanelOpen} />
+      <WhitelistedPanel merchants={whitelisted} open={panelOpen} onOpenChange={setPanelOpen} canExport={canExport} />
     </div>
   );
 }

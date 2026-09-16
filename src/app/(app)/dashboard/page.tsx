@@ -49,6 +49,11 @@ export default async function DashboardPage({
   const selectedIds = (params.mx ?? "").split(",").filter(Boolean);
   const session = await auth();
   const canEditRoadmap = canMutate(session?.user?.role, "roadmap");
+  // CSV export is gated to Manager access and above — same threshold as
+  // every other general-area mutation, but tracked as its own prop rather
+  // than reusing canEdit/canEditRoadmap so this stays correct even where
+  // those diverge (e.g. canEditRoadmap is Admin-only).
+  const canExport = canMutate(session?.user?.role);
 
   // An explicit mx selection (which merchants, not which time window)
   // narrows every section on the page equally.
@@ -224,12 +229,13 @@ export default async function DashboardPage({
             byMx={activationFunnelByMx(mList, crmActivatedIds)}
             byBranches={activationFunnelByBranches(mList, crmActivatedIds)}
             whitelisted={whitelistedMerchants(mList)}
+            canExport={canExport}
           />
         </section>
 
         <section>
           <h2 className="mb-3 text-[16px] font-semibold text-foreground">Sales Status</h2>
-          <SalesStatusSection data={salesStatus(salesStatusMList)} merchants={salesStatusMList} />
+          <SalesStatusSection data={salesStatus(salesStatusMList)} merchants={salesStatusMList} canExport={canExport} />
         </section>
 
         <section>
@@ -244,6 +250,7 @@ export default async function DashboardPage({
               breakup={creditBreakupByMid(mList, snapshotsByMerchant, creditDateRange)}
               {...wowCreditTrend(mList, snapshotsByMerchant, creditDateRange)}
               detailsRows={creditConsumptionTable(mList, snapshotsByMerchant, creditDateRange)}
+              canExport={canExport}
             />
             <Suspense fallback={<Skeleton className="h-[352px] w-full rounded-xl" />}>
               <OverallTrendLoader from={creditDateRange.from} to={creditDateRange.to} />
@@ -260,6 +267,7 @@ export default async function DashboardPage({
             crmActivatedCount={crmActivatedIds.size}
             customersReachedByChannel={customersReachedByChannel(mList, snapshotsByMerchant, creditDateRange)}
             customersReachedRows={customersReachedTable(mList, snapshotsByMerchant, creditDateRange)}
+            canExport={canExport}
           />
         </section>
 
@@ -270,6 +278,7 @@ export default async function DashboardPage({
             requestStats={requestTypeStats(requestRows)}
             roadmapItems={roadmapRows}
             canEditRoadmap={canEditRoadmap}
+            canExport={canExport}
           />
         </section>
       </div>

@@ -109,9 +109,11 @@ function DonutChart({
 export function SalesStatusSection({
   data,
   merchants,
+  canExport,
 }: {
   data: SalesStatus;
   merchants: PaymentsRow[];
+  canExport?: boolean;
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelFilter, setPanelFilter] = useState<PanelFilter>("all");
@@ -190,7 +192,7 @@ export function SalesStatusSection({
         </div>
       </ChartCard>
 
-      <PaymentsPanel merchants={panelMerchants} open={panelOpen} onOpenChange={setPanelOpen} />
+      <PaymentsPanel merchants={panelMerchants} open={panelOpen} onOpenChange={setPanelOpen} canExport={canExport} />
     </div>
   );
 }

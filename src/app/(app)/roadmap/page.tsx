@@ -32,6 +32,10 @@ export default async function RoadmapPage({
   const params = await searchParams;
   const session = await auth();
   const canEdit = canMutate(session?.user?.role, "roadmap");
+  // Export is Manager-and-above (the general threshold), unlike canEdit
+  // above which is Admin-only for this page specifically — Manager can
+  // read/export a roadmap it can't edit.
+  const canExport = canMutate(session?.user?.role);
 
   const where: Prisma.RoadmapItemWhereInput = {};
   if (params.status && params.status !== "all") where.status = params.status;
@@ -70,7 +74,7 @@ export default async function RoadmapPage({
         </div>
       </div>
 
-      <RoadmapTable rows={rows} canEdit={canEdit} />
+      <RoadmapTable rows={rows} canEdit={canEdit} canExport={canExport} />
     </div>
   );
 }
