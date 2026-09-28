@@ -307,6 +307,13 @@ model RoadmapItem {
   // never touched by the sync so ops-entered tickets survive it.
   isManual         Boolean  @default(false)
   syncedAt         DateTime @default(now()) @updatedAt
+  // Set by updateRoadmapStatus (the in-app status dropdown) whenever a
+  // human changes a sheet-sourced item's status directly — syncRoadmap()
+  // matches rows by title across its delete+recreate cycle and keeps this
+  // item's status/statusOverriddenAt instead of overwriting it from the
+  // sheet's own (usually stale) status column, so a manual "Shipped" no
+  // longer gets silently reverted by the next daily sync.
+  statusOverriddenAt DateTime?
 
   @@index([status])
   @@index([priority])

@@ -15,7 +15,15 @@ export async function updateRoadmapStatus(id: string, status: string) {
   const trimmed = status.trim();
   if (!trimmed || trimmed.length > 100) return;
 
-  await prisma.roadmapItem.update({ where: { id }, data: { status: trimmed } });
+  // statusOverriddenAt tells the next syncRoadmap() run (see
+  // sync-gsheets.ts) to keep this status instead of overwriting it from
+  // the sheet's own column — without it, a manual change here got quietly
+  // reverted by the very next daily sync whenever the source sheet hadn't
+  // been updated to match.
+  await prisma.roadmapItem.update({
+    where: { id },
+    data: { status: trimmed, statusOverriddenAt: new Date() },
+  });
   revalidatePath("/roadmap");
   revalidatePath("/dashboard");
 }

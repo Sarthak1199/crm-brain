@@ -300,12 +300,32 @@ export async function syncRoadmap() {
     })
     .filter((item): item is typeof item & { title: string } => !!item.title);
 
+  // A human can move a sheet-sourced item's status via the in-app dropdown
+  // (updateRoadmapStatus), which stamps statusOverriddenAt. Without this,
+  // the delete+recreate below silently reverted that change back to
+  // whatever the sheet's own status column said the very next sync —
+  // usually stale, since ops tracks lifecycle in this app, not the sheet.
+  // Matched by title (the only field every row is required to have and the
+  // one this sync already treats as identity via the filter above) since
+  // rows get fresh ids every sync and there's no other stable key.
+  const overridden = await prisma.roadmapItem.findMany({
+    where: { isManual: false, statusOverriddenAt: { not: null } },
+    select: { title: true, status: true, statusOverriddenAt: true },
+  });
+  const overrideByTitle = new Map(overridden.map((o) => [o.title, o]));
+
+  const finalItems = items.map((item) => {
+    const override = overrideByTitle.get(item.title);
+    if (!override) return item;
+    return { ...item, status: override.status, statusOverriddenAt: override.statusOverriddenAt };
+  });
+
   await prisma.$transaction([
     prisma.roadmapItem.deleteMany({ where: { isManual: false } }),
-    ...(items.length > 0 ? [prisma.roadmapItem.createMany({ data: items })] : []),
+    ...(finalItems.length > 0 ? [prisma.roadmapItem.createMany({ data: finalItems })] : []),
   ]);
 
-  return { count: items.length };
+  return { count: finalItems.length };
 }
 
 export async function syncGsheets() {
