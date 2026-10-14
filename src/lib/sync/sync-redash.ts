@@ -405,6 +405,8 @@ export async function syncLoyaltyFunnel() {
           loyaltyStatus: status,
           loyaltyPointsEarned: Math.round(row.points_earned ?? 0),
           loyaltyPointsBurned: Math.round(row.points_redeemed ?? 0),
+          loyaltyPointsManuallyImported: Math.round(row.points_manually_imported ?? 0),
+          loyaltyPointsBonusAwarded: Math.round(row.points_bonus_awarded ?? 0),
           customerCount: Math.round(row.total_enrolled ?? 0),
         },
       });

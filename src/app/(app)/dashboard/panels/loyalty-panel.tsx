@@ -1,13 +1,24 @@
 "use client";
 
 import { StatusBadge } from "@/components/status-badge";
+import { SyncFieldButton } from "@/components/sync-field-button";
 import { formatNumber } from "@/lib/format";
 import type { SerializedMerchant } from "@/lib/serialize";
 import { TypedAdoptionPanel, type ExtraColumn } from "./typed-adoption-panel";
 
 type Row = Pick<
   SerializedMerchant,
-  "id" | "brandName" | "dotpeMid" | "totalStores" | "loyaltyStatus" | "loyaltyProgram" | "loyaltyPointsEarned" | "loyaltyPointsBurned"
+  | "id"
+  | "brandName"
+  | "dotpeMid"
+  | "totalStores"
+  | "loyaltyStatus"
+  | "loyaltyProgram"
+  | "loyaltyPointsEarned"
+  | "loyaltyPointsBurned"
+  | "loyaltyPointsManuallyImported"
+  | "loyaltyPointsBonusAwarded"
+  | "customerCount"
 >;
 
 const COLUMNS: ExtraColumn<Row>[] = [
@@ -37,6 +48,27 @@ const COLUMNS: ExtraColumn<Row>[] = [
     accessor: (r) => r.loyaltyPointsBurned,
     render: (r) => formatNumber(r.loyaltyPointsBurned),
   },
+  {
+    key: "loyaltyPointsManuallyImported",
+    label: "Pts Manually Imported",
+    align: "right",
+    accessor: (r) => r.loyaltyPointsManuallyImported,
+    render: (r) => formatNumber(r.loyaltyPointsManuallyImported),
+  },
+  {
+    key: "loyaltyPointsBonusAwarded",
+    label: "Bonus Points",
+    align: "right",
+    accessor: (r) => r.loyaltyPointsBonusAwarded,
+    render: (r) => formatNumber(r.loyaltyPointsBonusAwarded),
+  },
+  {
+    key: "customerCount",
+    label: "Total Enrolled",
+    align: "right",
+    accessor: (r) => r.customerCount,
+    render: (r) => formatNumber(r.customerCount),
+  },
 ];
 
 export function LoyaltyPanel({
@@ -59,6 +91,9 @@ export function LoyaltyPanel({
       open={open}
       onOpenChange={onOpenChange}
       canExport={canExport}
+      headerAction={
+        canExport ? <SyncFieldButton endpoint="/api/admin/sync-loyalty-funnel" label="Sync loyalty data" /> : undefined
+      }
     />
   );
 }

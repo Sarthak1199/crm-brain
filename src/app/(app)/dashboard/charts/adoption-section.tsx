@@ -106,6 +106,8 @@ type AdoptionRow = Pick<
   | "loyaltyProgram"
   | "loyaltyPointsEarned"
   | "loyaltyPointsBurned"
+  | "loyaltyPointsManuallyImported"
+  | "loyaltyPointsBonusAwarded"
   | "automationsRules"
   | "automationsTotalSent"
   | "customerCount"

@@ -41,6 +41,7 @@ export function TypedAdoptionPanel<T extends CommonAdoptionRow>({
   open,
   onOpenChange,
   canExport = false,
+  headerAction,
 }: {
   title: string;
   description: string;
@@ -51,6 +52,7 @@ export function TypedAdoptionPanel<T extends CommonAdoptionRow>({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   canExport?: boolean;
+  headerAction?: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
@@ -77,9 +79,12 @@ export function TypedAdoptionPanel<T extends CommonAdoptionRow>({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full gap-0 overflow-y-auto data-[side=right]:sm:max-w-3xl">
-        <SheetHeader className="border-b border-border pb-4">
-          <SheetTitle className="text-[18px]">{title}</SheetTitle>
-          <SheetDescription>{description}</SheetDescription>
+        <SheetHeader className="flex-row items-start justify-between gap-3 border-b border-border pb-4">
+          <div>
+            <SheetTitle className="text-[18px]">{title}</SheetTitle>
+            <SheetDescription>{description}</SheetDescription>
+          </div>
+          {headerAction}
         </SheetHeader>
 
         <div className="p-4">

@@ -132,6 +132,8 @@ export type LoyaltyFunnelRow = {
   merchant_name: string;
   total_enrolled: number;
   points_earned: number;
+  points_manually_imported: number;
+  points_bonus_awarded: number;
   points_redeemed: number;
 };
 

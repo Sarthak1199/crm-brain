@@ -168,9 +168,11 @@ model Merchant {
   totalContactsReached     Int     @default(0)
 
   // Loyalty
-  loyaltyProgram      String?
-  loyaltyPointsEarned Int     @default(0)
-  loyaltyPointsBurned Int     @default(0)
+  loyaltyProgram               String?
+  loyaltyPointsEarned          Int     @default(0)
+  loyaltyPointsBurned          Int     @default(0)
+  loyaltyPointsManuallyImported Int    @default(0)
+  loyaltyPointsBonusAwarded     Int    @default(0)
 
   // Automations
   automationsRules        Json?

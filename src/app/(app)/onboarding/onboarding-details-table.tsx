@@ -58,7 +58,8 @@ export function OnboardingDetailsTable({
   });
 
   return (
-    <div>
+    <div className="relative">
+      <div aria-hidden className="pointer-events-none select-none blur-sm">
       <div className="mb-3 flex items-center gap-2">
         <div className="relative max-w-xs flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -128,6 +129,12 @@ export function OnboardingDetailsTable({
           )}
         </TableBody>
       </Table>
+      </div>
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center rounded-xl">
+        <span className="rounded-full border border-border bg-card px-4 py-1.5 text-[13px] font-medium text-muted-foreground shadow-sm">
+          Coming soon
+        </span>
       </div>
     </div>
   );
