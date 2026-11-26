@@ -71,7 +71,11 @@ export async function runRedashQuery(
   });
 
   if (!res.ok) {
-    throw new Error(`Redash query ${queryId} request failed: ${res.status}`);
+    const detail = await res
+      .json()
+      .then((b: { message?: string }) => b.message)
+      .catch(() => undefined);
+    throw new Error(`Redash query ${queryId} request failed: ${res.status}${detail ? ` — ${detail}` : ""}`);
   }
 
   const body = (await res.json()) as JobResponse | ResultResponse;

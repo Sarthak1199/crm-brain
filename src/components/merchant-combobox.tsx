@@ -24,7 +24,7 @@ export function MerchantCombobox({
   createdName = null,
   onCreateNew,
 }: {
-  merchants: { id: string; brandName: string }[];
+  merchants: { id: string; brandName: string; searchText?: string }[];
   value: string | null;
   onChange: (id: string) => void;
   placeholder?: string;
@@ -40,7 +40,7 @@ export function MerchantCombobox({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return merchants;
-    return merchants.filter((m) => m.brandName.toLowerCase().includes(q));
+    return merchants.filter((m) => (m.searchText ?? m.brandName.toLowerCase()).includes(q));
   }, [merchants, query]);
 
   const trimmedQuery = query.trim();

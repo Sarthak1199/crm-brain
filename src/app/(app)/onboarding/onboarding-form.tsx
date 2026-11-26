@@ -1,5 +1,6 @@
 "use client";
 
+import { isPendingMid } from "@/lib/sync/mid";
 import { useActionState, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Info, Loader2, Plus } from "lucide-react";
@@ -22,7 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-type MerchantOption = { id: string; brandName: string; dotpeMid: string; ristaBrandId: string | null };
+type MerchantOption = { id: string; brandName: string; searchText: string; dotpeMid: string; ristaBrandId: string | null };
 
 const LOYALTY_TYPES = ["Point based loyalty", "Visit based loyalty"];
 
@@ -236,7 +237,7 @@ export function OnboardingForm({ merchants, userEmail }: { merchants: MerchantOp
     setMerchantId(id);
     const m = id ? merchants.find((x) => x.id === id) : undefined;
     if (m) {
-      setField("enterpriseMerchantId", m.dotpeMid);
+      setField("enterpriseMerchantId", isPendingMid(m.dotpeMid) ? "" : m.dotpeMid);
       setField("ristaBrandId", m.ristaBrandId ?? "");
     }
   }
@@ -313,7 +314,7 @@ export function OnboardingForm({ merchants, userEmail }: { merchants: MerchantOp
                   <MerchantNameField
                     id="businessName"
                     name="businessName"
-                    merchants={merchants.map((m) => ({ id: m.id, brandName: m.brandName }))}
+                    merchants={merchants.map((m) => ({ id: m.id, brandName: m.brandName, searchText: m.searchText }))}
                     value={values.businessName}
                     onChange={(v) => setField("businessName", v)}
                     onSelectMerchant={handleMerchantPick}

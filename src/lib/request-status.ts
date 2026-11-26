@@ -14,3 +14,8 @@ export const REQUEST_STATUS_TONES: Record<string, string> = {
 export function requestStatusToneClass(status: string) {
   return REQUEST_STATUS_TONES[status] ?? "border-border bg-muted text-muted-foreground";
 }
+
+/** Groups requests by merchant; typed-in names with no Merchant row group by that name. */
+export function requestMerchantKey(r: { id: string; merchantId: string | null; merchantNameFreeText: string | null }) {
+  return r.merchantId ?? r.merchantNameFreeText?.trim().toLowerCase() ?? r.id;
+}

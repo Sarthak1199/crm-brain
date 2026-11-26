@@ -1,3 +1,6 @@
+import { formatMid } from "@/lib/sync/mid";
+import { MERCHANT_SEARCH_SELECT, merchantSearchText } from "@/lib/merchant-search";
+import { requestMerchantKey } from "@/lib/request-status";
 import type { Prisma } from "@prisma/client";
 import { Bug, Building2, IndianRupee, Lightbulb } from "lucide-react";
 import { prisma } from "@/lib/prisma";
@@ -49,30 +52,34 @@ export default async function RequestsPage({
       },
     }),
     prisma.merchant.findMany({
-      select: { id: true, brandName: true, totalStores: true, totalYearlyPotential: true },
+      select: { ...MERCHANT_SEARCH_SELECT, totalStores: true, totalYearlyPotential: true },
       orderBy: { brandName: "asc" },
     }),
   ]);
 
   const rows = requests.map((r) => ({
     ...serializeSupportRequest(r),
-    merchant: r.merchant ? { ...r.merchant, totalYearlyPotential: Number(r.merchant.totalYearlyPotential) } : null,
+    merchant: r.merchant
+      ? {
+          ...r.merchant,
+          dotpeMid: formatMid(r.merchant.dotpeMid),
+          totalYearlyPotential: Number(r.merchant.totalYearlyPotential),
+        }
+      : null,
   }));
 
-  const merchantOptions = merchants.map((m) => ({
+  const merchantOptions = merchants.map(({ onboardingRequests, ...m }) => ({
     ...m,
+    searchText: merchantSearchText({ ...m, onboardingRequests }),
     totalYearlyPotential: Number(m.totalYearlyPotential),
   }));
 
   // A merchant can have multiple request rows (one per individual ask), but
   // branches/potential describe the merchant, not the ask — count each
-  // merchant's footprint once, not once per request against it. A request
-  // with no real merchant (a freshly-typed name) has no shared identity to
-  // dedupe against, so it falls back to its own request id as the key —
-  // each such row counts on its own.
+  // merchant's footprint once, not once per request against it.
   const perMerchant = new Map<string, { totalBranches: number; totalPotential: number }>();
   for (const r of rows) {
-    const key = r.merchantId ?? r.id;
+    const key = requestMerchantKey(r);
     if (!perMerchant.has(key)) {
       perMerchant.set(key, { totalBranches: r.totalBranches, totalPotential: r.totalPotential });
     }

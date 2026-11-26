@@ -17,7 +17,7 @@ import { deleteSupportRequest } from "./actions";
 import { RequestForm } from "./request-form";
 import type { RequestRow } from "./requests-table";
 
-type MerchantOption = { id: string; brandName: string; totalStores: number; totalYearlyPotential: number };
+type MerchantOption = { id: string; brandName: string; searchText: string; totalStores: number; totalYearlyPotential: number };
 
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
 

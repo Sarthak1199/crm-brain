@@ -72,10 +72,11 @@ export async function getLastSyncStatus() {
   const sources: SyncSource[] = ["REDASH", "GSHEETS"];
   const results = await Promise.all(
     sources.map(async (source) => {
-      const [lastFinished, latestAttempt] = await Promise.all([
-        prisma.syncRun.findFirst({
+      const [recentRuns, latestAttempt] = await Promise.all([
+        prisma.syncRun.findMany({
           where: { source, finishedAt: { not: null } },
           orderBy: { finishedAt: "desc" },
+          take: 20,
           select: { finishedAt: true, success: true, summary: true },
         }),
         prisma.syncRun.findFirst({
@@ -85,12 +86,17 @@ export async function getLastSyncStatus() {
         }),
       ]);
 
-      const failedSteps =
-        lastFinished?.summary && typeof lastFinished.summary === "object"
-          ? Object.entries(lastFinished.summary as Record<string, unknown>)
-              .filter(([, v]) => isStepError(v))
-              .map(([step]) => step)
-          : [];
+      // Several crons share one source, each running different steps, so
+      // judge every step by its own newest result — otherwise one cron's
+      // success hides another's failure.
+      const lastFinished = recentRuns[0];
+      const latestByStep = new Map<string, unknown>();
+      for (const run of recentRuns) {
+        for (const [step, value] of Object.entries((run.summary ?? {}) as Record<string, unknown>)) {
+          if (!latestByStep.has(step)) latestByStep.set(step, value);
+        }
+      }
+      const failedSteps = [...latestByStep].filter(([, v]) => isStepError(v)).map(([step]) => step);
 
       const stuckAttempt =
         !!latestAttempt &&

@@ -7,6 +7,25 @@
  * compare equal.
  */
 export function normalizeMid(raw: string | number | null | undefined): string {
-  if (raw === null || raw === undefined) return "";
-  return String(raw).replace(/,/g, "").trim();
+  const value = String(raw ?? "").trim();
+  if (/^\d{1,3}(,\d{2,3})*,\d{3}$/.test(value)) return value.replace(/,/g, "");
+  // A cell listing several MIDs ("5850, 12438") resolves to the first one —
+  // stripping its commas used to mint a second, fake merchant.
+  return value.match(/\d+/)?.[0] ?? "";
+}
+
+// Deals close before ops creates the MID; until then the sales-sheet row lives
+// under a placeholder keyed by brand name.
+const PENDING_MID_PREFIX = "pending:";
+
+export function pendingMid(brandName: string) {
+  return PENDING_MID_PREFIX + brandName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+export function isPendingMid(mid: string) {
+  return mid.startsWith(PENDING_MID_PREFIX);
+}
+
+export function formatMid(mid: string) {
+  return isPendingMid(mid) ? "MID pending" : mid;
 }

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { pick, readSheetAsObjects, resolveSheetTitleByGid } from "@/lib/gsheets";
-import { normalizeMid } from "./mid";
+import { isPendingMid, normalizeMid } from "./mid";
 import { GSHEET_SOURCES } from "./gsheet-sources";
 import { mapWithConcurrency } from "./concurrency";
 
@@ -50,7 +50,9 @@ export async function syncLoyaltyOnboarding() {
   // round-trips on its own — a meaningful chunk of why this sync felt like
   // it hung), plus running the upserts themselves with bounded concurrency.
   const merchants = await prisma.merchant.findMany({ select: { id: true, dotpeMid: true } });
-  const merchantIdByMid = new Map(merchants.map((m) => [normalizeMid(m.dotpeMid), m.id]));
+  const merchantIdByMid = new Map(
+    merchants.filter((m) => !isPendingMid(m.dotpeMid)).map((m) => [normalizeMid(m.dotpeMid), m.id])
+  );
 
   const indexedRows = rows.map((row, i) => ({ row, sheetRowIndex: i + source.headerRow + 1 }));
 
@@ -80,7 +82,7 @@ export async function syncLoyaltyOnboarding() {
           ristaBrandId: pick(row, "brandid (rista):") ?? null,
           ristaAccountNumber: pick(row, "rista account number") ?? null,
           ristaBranchId: pick(row, "branchid (rista):") ?? null,
-          branchCode: pick(row, "branchcode:") ?? null,
+          branchCode: pick(row, "branchcodes:", "branchcode:") ?? null,
           storeCode: pick(row, "storecode:") ?? null,
           enterpriseStoreId: pick(row, "storeid (enterprise):") ?? null,
           loyaltyType: pick(row, "loyalty type") ?? null,
@@ -88,8 +90,8 @@ export async function syncLoyaltyOnboarding() {
           automation: isYes(pick(row, "automation?")),
           dotpeUsername: pick(row, "dotpe username") ?? null,
           crmLicenseRequested: isYes(pick(row, "crm license enable?")),
-          loyaltyEnabled: isYes(pick(row, "is enabled (do not fill)")),
-          loyaltyEnabledAt: parseEnabledAt(pick(row, "enabled at (do not fill)")),
+          loyaltyEnabled: isYes(pick(row, "loyalty is enabled (do not fill)", "is enabled (do not fill)")),
+          loyaltyEnabledAt: parseEnabledAt(pick(row, "loyalty enabled at (do not fill)", "enabled at (do not fill)")),
           crmEnabled: isYes(pick(row, "crm is enabled (do not fill)")),
           crmEnabledAt: parseEnabledAt(pick(row, "crm enabled at (do not fill)")),
           additionalComment: pick(row, "additional comments") ?? null,
@@ -105,7 +107,7 @@ export async function syncLoyaltyOnboarding() {
           ristaBrandId: pick(row, "brandid (rista):") ?? null,
           ristaAccountNumber: pick(row, "rista account number") ?? null,
           ristaBranchId: pick(row, "branchid (rista):") ?? null,
-          branchCode: pick(row, "branchcode:") ?? null,
+          branchCode: pick(row, "branchcodes:", "branchcode:") ?? null,
           storeCode: pick(row, "storecode:") ?? null,
           enterpriseStoreId: pick(row, "storeid (enterprise):") ?? null,
           loyaltyType: pick(row, "loyalty type") ?? null,
@@ -113,8 +115,8 @@ export async function syncLoyaltyOnboarding() {
           automation: isYes(pick(row, "automation?")),
           dotpeUsername: pick(row, "dotpe username") ?? null,
           crmLicenseRequested: isYes(pick(row, "crm license enable?")),
-          loyaltyEnabled: isYes(pick(row, "is enabled (do not fill)")),
-          loyaltyEnabledAt: parseEnabledAt(pick(row, "enabled at (do not fill)")),
+          loyaltyEnabled: isYes(pick(row, "loyalty is enabled (do not fill)", "is enabled (do not fill)")),
+          loyaltyEnabledAt: parseEnabledAt(pick(row, "loyalty enabled at (do not fill)", "enabled at (do not fill)")),
           crmEnabled: isYes(pick(row, "crm is enabled (do not fill)")),
           crmEnabledAt: parseEnabledAt(pick(row, "crm enabled at (do not fill)")),
           additionalComment: pick(row, "additional comments") ?? null,

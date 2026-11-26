@@ -73,7 +73,7 @@ function TypeBadge({ type }: { type: string }) {
   );
 }
 
-type MerchantOption = { id: string; brandName: string; totalStores: number; totalYearlyPotential: number };
+type MerchantOption = { id: string; brandName: string; searchText: string; totalStores: number; totalYearlyPotential: number };
 
 export function RequestsTable({
   rows,

@@ -22,6 +22,7 @@ export async function requireAuthenticated() {
   if (!session?.user) {
     throw new Error("You must be signed in to do this.");
   }
+  return session.user;
 }
 
 // Stricter than requireMutate: Admin only, no Manager. For actions that

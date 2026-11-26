@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { pick, readSheetAsObjects, resolveSheetTitleByGid } from "@/lib/gsheets";
-import { normalizeMid } from "./mid";
+import { isPendingMid, normalizeMid, pendingMid } from "./mid";
 import { withSyncRun, runStep } from "./sync-run";
 import { mapWithConcurrency } from "./concurrency";
 import { GSHEET_SOURCES } from "./gsheet-sources";
@@ -78,114 +78,121 @@ export async function syncCrmActiveSheet() {
   return { matched, skipped };
 }
 
+// A renamed header would otherwise read as "blank everywhere" and wipe real figures.
+const SALES_SHEET_HEADERS = [
+  "mid",
+  "brand name",
+  "payment collected",
+  "outlet closed",
+  "total no. of outlets",
+  "pending outlet closure",
+  "per outlet commercials (yearly)",
+  "pending potential as per total deal value",
+  "crm activation status",
+  "loyalty activation status",
+];
+
 /**
- * "CRM+Loyalty closures" tab — brand identity, payment collected, outlet
- * counts, and the *authoritative* yearly potential figure (ops-maintained,
- * takes priority over the activeDineInStores × 10000 formula). "Payment
- * collected" also doubles as subscriptionRevenue — same underlying figure.
+ * "CRM+Loyalty closures" tab — the sales sheet, and the only source for
+ * payment collected, per-outlet commercials, closed/pending branches and
+ * pending potential. The app mirrors it: a figure cleared or a row removed
+ * there is cleared here on the next sync.
  */
 export async function syncCrmLoyaltyClosuresSheet() {
   const source = GSHEET_SOURCES.crmLoyaltyClosures;
   const title = await resolveSheetTitleByGid(source.spreadsheetId, source.gid);
   const rows = await readSheetAsObjects(source.spreadsheetId, title, source.headerRow);
 
+  const headers = new Set(rows.flatMap((row) => Object.keys(row)));
+  const missing = SALES_SHEET_HEADERS.filter((h) => !headers.has(h));
+  if (missing.length > 0) {
+    throw new Error(`Sales sheet columns missing or renamed: ${missing.join(", ")}`);
+  }
+
   let matched = 0;
   let created = 0;
   let skipped = 0;
 
   // The sheet sometimes has the same MID on more than one row (distinct
-  // closure entries, occasionally even under different brand names — a
-  // sheet data-entry issue, not something we can resolve by picking one).
-  // Grouping first and summing payment across the group's rows means a
-  // second row for the same MID adds to the total instead of overwriting
-  // it and silently losing the first row's amount.
+  // closure entries, occasionally even under different brand names), so the
+  // figures are summed across a MID's rows.
   type Group = {
-    ristaBrandId?: string;
+    accountNumber?: string;
     brandName?: string;
-    paymentSum: number;
-    hasPayment: boolean;
     totalStores?: number;
-    pendingBranches?: number;
-    closedBranches?: number;
-    totalYearlyPotential?: number;
-    pendingPotentialClosure?: number;
-    perOutletCommercials?: number;
+    paymentCollected: number;
+    closedBranches: number;
+    pendingBranches: number;
+    pendingPotentialClosure: number;
+    perOutletCommercials: number;
     loyaltyStatus?: "Active" | "Inactive";
     crmActivationConfirmed: boolean;
   };
   const groups = new Map<string, Group>();
 
   for (const row of rows) {
-    const dotpeMid = normalizeMid(pick(row, "mid"));
     const brandName = pick(row, "brand name");
+    const paymentCollected = parseAmount(pick(row, "payment collected")) ?? 0;
+    const closedBranches = parseInt_(pick(row, "outlet closed")) ?? 0;
+
+    let dotpeMid = normalizeMid(pick(row, "mid"));
     if (!dotpeMid) {
-      skipped++;
-      continue;
+      // No MID yet: still count a closed deal; ignore blank and pipeline rows.
+      if (!brandName || (paymentCollected <= 0 && closedBranches <= 0)) {
+        skipped++;
+        continue;
+      }
+      dotpeMid = pendingMid(brandName);
     }
 
-    const ristaBrandId = pick(row, "rista acc number");
-    const paymentCollected = parseAmount(pick(row, "payment collected"));
-    const totalStores = parseInt_(pick(row, "total no. of outlets"));
-    const pendingBranches = parseInt_(pick(row, "pending outlet closure"));
-    const closedBranches = parseInt_(pick(row, "outlet closed"));
-    const totalYearlyPotential = parseAmount(pick(row, "total potential closure yearly"));
-    const pendingPotentialClosure = parseAmount(pick(row, "pending potential closure"));
-    const perOutletCommercials = parseAmount(pick(row, "per outlet commercials"));
-    const loyaltyStatus = parseYesNo(pick(row, "loyalty activation status"));
-    // Explicit boolean, not optional: absence/"No" in this sheet must be able
-    // to revoke a previously-confirmed value, not just leave it alone. This
-    // tracks CRM system activation specifically — a separate, later event
-    // from a sale closing — see isPaid() in dashboard-data.ts, which uses
-    // closedBranches > 0 (the "Outlet closed" column) instead.
-    const crmActivationConfirmed = (pick(row, "crm activation status") ?? "").trim().toLowerCase() === "yes";
-
-    const existingGroup = groups.get(dotpeMid);
+    const g = groups.get(dotpeMid);
     groups.set(dotpeMid, {
-      ristaBrandId: ristaBrandId ?? existingGroup?.ristaBrandId,
-      brandName: brandName ?? existingGroup?.brandName,
-      paymentSum: (existingGroup?.paymentSum ?? 0) + (paymentCollected ?? 0),
-      hasPayment: (existingGroup?.hasPayment ?? false) || paymentCollected !== undefined,
-      totalStores: totalStores ?? existingGroup?.totalStores,
-      pendingBranches: pendingBranches ?? existingGroup?.pendingBranches,
-      closedBranches: closedBranches ?? existingGroup?.closedBranches,
-      totalYearlyPotential: totalYearlyPotential ?? existingGroup?.totalYearlyPotential,
-      pendingPotentialClosure: pendingPotentialClosure ?? existingGroup?.pendingPotentialClosure,
-      perOutletCommercials: perOutletCommercials ?? existingGroup?.perOutletCommercials,
-      loyaltyStatus: loyaltyStatus ?? existingGroup?.loyaltyStatus,
-      // A later row's explicit confirmation should win, but don't let a
-      // blank/"No" later row silently revoke an earlier row's "Yes".
-      crmActivationConfirmed: crmActivationConfirmed || (existingGroup?.crmActivationConfirmed ?? false),
+      // An account number, not a brand id — several MIDs can share one.
+      accountNumber: pick(row, "rista acc number") ?? g?.accountNumber,
+      brandName: brandName ?? g?.brandName,
+      totalStores: parseInt_(pick(row, "total no. of outlets")) ?? g?.totalStores,
+      paymentCollected: (g?.paymentCollected ?? 0) + paymentCollected,
+      closedBranches: (g?.closedBranches ?? 0) + closedBranches,
+      pendingBranches: (g?.pendingBranches ?? 0) + (parseInt_(pick(row, "pending outlet closure")) ?? 0),
+      pendingPotentialClosure:
+        (g?.pendingPotentialClosure ?? 0) +
+        (parseAmount(pick(row, "pending potential as per total deal value")) ?? 0),
+      perOutletCommercials:
+        parseAmount(pick(row, "per outlet commercials (yearly)")) ?? g?.perOutletCommercials ?? 0,
+      loyaltyStatus: parseYesNo(pick(row, "loyalty activation status")) ?? g?.loyaltyStatus,
+      // Tracks CRM system activation, a later event than the sale closing.
+      // Any row's "Yes" wins; no "Yes" at all revokes it.
+      crmActivationConfirmed:
+        (pick(row, "crm activation status") ?? "").trim().toLowerCase() === "yes" ||
+        (g?.crmActivationConfirmed ?? false),
     });
   }
 
-  // This is the sheet that feeds "Total Collected (INR)" (paymentCollected /
-  // subscriptionRevenue) — one serial DB round-trip per grouped merchant was
-  // slow enough, at current sheet size, that the sync could die partway
-  // through the Map's iteration order before reaching every group. Whichever
-  // merchants came later never got their latest payment written, silently
-  // under-reporting the platform-wide total. Bounded concurrency (each
-  // group is a distinct merchant, so no write races) fixes both the
-  // under-count and the timeout it was a symptom of.
+  if (![...groups.values()].some((g) => g.paymentCollected > 0)) {
+    throw new Error("Sales sheet has no payments at all — refusing to overwrite the app's figures.");
+  }
+
+  // Bounded concurrency: one serial round-trip per merchant was slow enough
+  // that the sync could die partway and silently under-report revenue.
   const outcomes = await mapWithConcurrency(Array.from(groups), 15, async ([dotpeMid, g]) => {
     const updateData = {
-      ...(g.ristaBrandId ? { ristaBrandId: g.ristaBrandId } : {}),
+      ...(g.accountNumber ? { accountNumber: g.accountNumber } : {}),
       ...(g.brandName ? { brandName: g.brandName } : {}),
-      ...(g.hasPayment ? { paymentCollected: g.paymentSum, subscriptionRevenue: g.paymentSum } : {}),
       ...(g.totalStores !== undefined ? { totalStores: g.totalStores } : {}),
-      ...(g.pendingBranches !== undefined ? { pendingBranches: g.pendingBranches } : {}),
-      ...(g.closedBranches !== undefined ? { closedBranches: g.closedBranches } : {}),
-      ...(g.totalYearlyPotential !== undefined ? { totalYearlyPotential: g.totalYearlyPotential } : {}),
-      ...(g.pendingPotentialClosure !== undefined
-        ? { pendingPotentialClosure: g.pendingPotentialClosure }
-        : {}),
-      ...(g.perOutletCommercials !== undefined
-        ? { perOutletCommercials: g.perOutletCommercials }
-        : {}),
+      paymentCollected: g.paymentCollected,
+      subscriptionRevenue: g.paymentCollected,
+      closedBranches: g.closedBranches,
+      pendingBranches: g.pendingBranches,
+      pendingPotentialClosure: g.pendingPotentialClosure,
+      perOutletCommercials: g.perOutletCommercials,
       ...(g.loyaltyStatus ? { loyaltyStatus: g.loyaltyStatus } : {}),
       crmActivationConfirmed: g.crmActivationConfirmed,
     };
 
     try {
+      if (g.brandName && !isPendingMid(dotpeMid)) {
+        await adoptPendingMerchant(pendingMid(g.brandName), dotpeMid);
+      }
       const existing = await prisma.merchant.findUnique({ where: { dotpeMid }, select: { id: true } });
       if (existing) {
         await prisma.merchant.update({ where: { dotpeMid }, data: updateData });
@@ -210,7 +217,73 @@ export async function syncCrmLoyaltyClosuresSheet() {
     skipped += o.skipped;
   }
 
-  return { matched, created, skipped };
+  const cleared = await clearMerchantsNotInSalesSheet([...groups.keys()]);
+  const pendingMidCount = [...groups.keys()].filter(isPendingMid).length;
+
+  return { matched, created, skipped, cleared, pendingMid: pendingMidCount };
+}
+
+/** Once the sheet gains a MID, fold the brand's placeholder into the real merchant. */
+async function adoptPendingMerchant(placeholderMid: string, dotpeMid: string) {
+  const placeholder = await prisma.merchant.findUnique({ where: { dotpeMid: placeholderMid }, select: { id: true } });
+  if (!placeholder) return;
+
+  const real = await prisma.merchant.findUnique({ where: { dotpeMid }, select: { id: true } });
+  if (!real) {
+    await prisma.merchant.update({ where: { id: placeholder.id }, data: { dotpeMid } });
+    return;
+  }
+  const move = { where: { merchantId: placeholder.id }, data: { merchantId: real.id } };
+  await prisma.$transaction([
+    prisma.supportRequest.updateMany(move),
+    prisma.onboardingRequest.updateMany(move),
+    prisma.merchant.delete({ where: { id: placeholder.id } }),
+  ]);
+}
+
+async function clearMerchantsNotInSalesSheet(sheetMids: string[]) {
+  const absent = await prisma.merchant.findMany({
+    where: { dotpeMid: { notIn: sheetMids } },
+    select: { id: true, dotpeMid: true, brandName: true },
+  });
+
+  // A placeholder exists only because of its sheet row, so it goes with it.
+  const placeholders = absent.filter((m) => isPendingMid(m.dotpeMid));
+  for (const p of placeholders) {
+    await prisma.$transaction([
+      prisma.supportRequest.updateMany({
+        where: { merchantId: p.id },
+        data: { merchantId: null, merchantNameFreeText: p.brandName },
+      }),
+      prisma.merchant.delete({ where: { id: p.id } }),
+    ]);
+  }
+
+  const { count } = await prisma.merchant.updateMany({
+    where: {
+      id: { in: absent.filter((m) => !isPendingMid(m.dotpeMid)).map((m) => m.id) },
+      OR: [
+        { paymentCollected: { not: 0 } },
+        { subscriptionRevenue: { not: 0 } },
+        { closedBranches: { not: 0 } },
+        { pendingBranches: { not: 0 } },
+        { pendingPotentialClosure: { not: 0 } },
+        { perOutletCommercials: { not: 0 } },
+        { crmActivationConfirmed: true },
+      ],
+    },
+    data: {
+      paymentCollected: 0,
+      subscriptionRevenue: 0,
+      closedBranches: 0,
+      pendingBranches: 0,
+      pendingPotentialClosure: 0,
+      perOutletCommercials: 0,
+      crmActivationConfirmed: false,
+    },
+  });
+
+  return count + placeholders.length;
 }
 
 /**
@@ -331,8 +404,8 @@ export async function syncRoadmap() {
 export async function syncGsheets() {
   return withSyncRun("GSHEETS", async () => ({
     crmActive: await runStep("crmActive", syncCrmActiveSheet),
-    crmLoyaltyClosures: await runStep("crmLoyaltyClosures", syncCrmLoyaltyClosuresSheet),
     crmGtmDemo: await runStep("crmGtmDemo", syncCrmGtmDemoSheet),
+    crmLoyaltyClosures: await runStep("crmLoyaltyClosures", syncCrmLoyaltyClosuresSheet),
     roadmap: await runStep("roadmap", syncRoadmap),
     loyaltyOnboarding: await runStep("loyaltyOnboarding", syncLoyaltyOnboarding),
   }));

@@ -1,3 +1,5 @@
+import { formatMid, normalizeMid } from "@/lib/sync/mid";
+import { MERCHANT_SEARCH_SELECT, merchantSearchText } from "@/lib/merchant-search";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { canMutate } from "@/lib/authz";
@@ -29,7 +31,7 @@ export default async function OnboardingPage() {
       orderBy: { brandName: "asc" },
     }),
     prisma.merchant.findMany({
-      select: { id: true, brandName: true, dotpeMid: true, ristaBrandId: true },
+      select: { ...MERCHANT_SEARCH_SELECT, ristaBrandId: true },
       orderBy: { brandName: "asc" },
     }),
   ]);
@@ -41,7 +43,10 @@ export default async function OnboardingPage() {
   // actioned, not the merchant's actual current license state.
   const crmLicenseEnabled = merchants.filter((m) => m.crmStatus === "Active").length;
   // "Dotpe CRM [Activation] — Loyalty enable" GSheet's write-back column.
-  const loyaltyLicenseEnabled = requests.filter((r) => r.loyaltyEnabled).length;
+  // Distinct MIDs — one merchant can file several requests.
+  const loyaltyLicenseEnabled = new Set(
+    requests.filter((r) => r.loyaltyEnabled).map((r) => normalizeMid(r.enterpriseMerchantId) || r.id)
+  ).size;
   // wabaStatus is the app's existing "Marketing License" field (see the
   // Licenses table below) — fed by the mxGrain sync (Redash 11166's
   // Has_WABA), same source as ristaStatus/dotpeStatus in that table.
@@ -62,7 +67,7 @@ export default async function OnboardingPage() {
   const detailsRows = merchants.map((m) => ({
     id: m.id,
     brandName: m.brandName,
-    dotpeMid: m.dotpeMid,
+    dotpeMid: formatMid(m.dotpeMid),
     totalStores: m.totalStores,
     // Real CRM license state from Redash (query 10505's crm_status), not
     // usage. Loyalty is still the onboarding sheet's ops-confirmed write-back.
@@ -80,7 +85,7 @@ export default async function OnboardingPage() {
           title="Onboarding"
           description="Loyalty & CRM license requests — raised here or via the original Google Form."
         />
-        {canEdit ? <OnboardingForm merchants={comboMerchants} userEmail={session?.user?.email ?? ""} /> : null}
+        {canEdit ? <OnboardingForm merchants={comboMerchants.map((m) => ({ ...m, searchText: merchantSearchText(m) }))} userEmail={session?.user?.email ?? ""} /> : null}
       </div>
 
       <div className="sticky top-16 z-[5] -mx-6 mb-6 border-b border-border bg-background/95 px-6 py-3 backdrop-blur md:-mx-8 md:px-8">

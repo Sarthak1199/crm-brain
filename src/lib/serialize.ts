@@ -1,3 +1,4 @@
+import { formatMid } from "@/lib/sync/mid";
 import type { Merchant, MerchantSnapshot, SupportRequest, RoadmapItem } from "@prisma/client";
 
 const DECIMAL_FIELDS = [
@@ -20,7 +21,7 @@ export function serializeMerchant(m: Merchant): SerializedMerchant {
   const decimals = Object.fromEntries(DECIMAL_FIELDS.map((f) => [f, Number(m[f])])) as {
     [K in (typeof DECIMAL_FIELDS)[number]]: number;
   };
-  return { ...m, ...decimals };
+  return { ...m, ...decimals, dotpeMid: formatMid(m.dotpeMid) };
 }
 
 export type SerializedSnapshot = Omit<MerchantSnapshot, "value"> & { value: number };

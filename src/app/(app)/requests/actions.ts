@@ -186,7 +186,7 @@ export async function createSupportRequest(
   _prevState: string | undefined,
   formData: FormData
 ): Promise<string | undefined> {
-  await requireAuthenticated();
+  const user = await requireAuthenticated();
   const parsed = parseDescriptionFields(formData);
   if ("error" in parsed) return parsed.error;
   const { shared, descriptions, files } = parsed.data;
@@ -198,7 +198,7 @@ export async function createSupportRequest(
 
   for (const description of descriptions) {
     const created = await prisma.supportRequest.create({
-      data: { ...shared, description },
+      data: { ...shared, description, createdBy: user.email },
     });
 
     if (files.length > 0) {

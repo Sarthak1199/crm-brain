@@ -33,7 +33,7 @@ const DEFAULT_PRESET_DAYS = 30;
 export function DashboardFilters({
   merchantOptions,
 }: {
-  merchantOptions: { id: string; brandName: string }[];
+  merchantOptions: { id: string; brandName: string; searchText: string }[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -110,7 +110,7 @@ export function DashboardFilters({
   const filteredMerchants = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return merchantOptions;
-    return merchantOptions.filter((m) => m.brandName.toLowerCase().includes(q));
+    return merchantOptions.filter((m) => m.searchText.includes(q));
   }, [merchantOptions, query]);
 
   return (

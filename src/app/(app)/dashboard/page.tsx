@@ -33,6 +33,7 @@ import { CreditConsumptionKpiSection } from "./charts/credit-consumption-kpis";
 import { OverallTrendLoader } from "./charts/overall-trend-loader";
 import { AdoptionSection } from "./charts/adoption-section";
 import { ProductStatusSection } from "./charts/product-status-section";
+import { MERCHANT_SEARCH_SELECT, merchantSearchText } from "@/lib/merchant-search";
 
 type SearchParams = {
   from?: string;
@@ -159,7 +160,7 @@ export default async function DashboardPage({
         },
       }),
       prisma.merchant.findMany({ where: salesStatusWhere, orderBy: { brandName: "asc" } }),
-      prisma.merchant.findMany({ select: { id: true, brandName: true }, orderBy: { brandName: "asc" } }),
+      prisma.merchant.findMany({ select: MERCHANT_SEARCH_SELECT, orderBy: { brandName: "asc" } }),
       prisma.roadmapItem.findMany({ orderBy: { title: "asc" } }),
       prisma.supportRequest.findMany(),
       prisma.onboardingRequest.findMany({
@@ -217,7 +218,9 @@ export default async function DashboardPage({
 
       <div className="sticky top-16 z-[5] -mx-6 mb-6 border-b border-border bg-background/95 px-6 py-3 backdrop-blur md:-mx-8 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <DashboardFilters merchantOptions={allMerchants} />
+          <DashboardFilters
+            merchantOptions={allMerchants.map((m) => ({ id: m.id, brandName: m.brandName, searchText: merchantSearchText(m) }))}
+          />
           <SyncStatusBar />
         </div>
       </div>
